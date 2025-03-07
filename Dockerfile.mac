@@ -62,7 +62,7 @@ RUN set -ex && \
     chmod 1777 /tmp && ls -ld /tmp && \
     echo "Package source configuration complete."
 
-RUN echo "Line 64"
+RUN echo "Line 65"
 
 RUN set -ex && \
     echo "Updating package lists..." && \
