@@ -1,0 +1,331 @@
+# base stage
+FROM ubuntu:22.04 AS base
+USER root
+SHELL ["/bin/bash", "-c"]
+
+ARG NEED_MIRROR=0
+ARG LIGHTEN=0
+ENV LIGHTEN=${LIGHTEN}
+WORKDIR /ragflow
+
+# Set up directories
+RUN mkdir -p /ragflow/rag/res/deepdoc /root/.ragflow && \
+    echo "Created base directories"
+
+# Copy models downloaded via download_deps.py with better progress and timeout handling
+RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/huggingface.co,target=/huggingface.co \
+    echo "Copying HuggingFace model files..." && \
+    cp /huggingface.co/InfiniFlow/huqie/huqie.txt.trie /ragflow/rag/res/ && \
+    echo "Extracting DeepDoc models..." && \
+    tar --exclude='.*' -cvf - \
+        /huggingface.co/InfiniFlow/text_concat_xgb_v1.0 \
+        /huggingface.co/InfiniFlow/deepdoc \
+        | tar -xf - --strip-components=3 -C /ragflow/rag/res/deepdoc && \
+    echo "Model extraction completed"
+
+RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/huggingface.co,target=/huggingface.co \
+    echo "Starting model extraction for non-lighten mode..." && \
+    if [ "$LIGHTEN" != "1" ]; then \
+        echo "Extracting full model set..." && \
+        (tar -cvf - \
+            /huggingface.co/BAAI/bge-large-zh-v1.5 \
+            /huggingface.co/BAAI/bge-reranker-v2-m3 \
+            /huggingface.co/maidalun1020/bce-embedding-base_v1 \
+            /huggingface.co/maidalun1020/bce-reranker-base_v1 \
+            | tar -xf - --strip-components=2 -C /root/.ragflow); \
+        echo "Full model extraction completed"; \
+    else \
+        echo "Skipping full model extraction in lighten mode"; \
+    fi
+
+# Copy NLTK data and Tika server
+RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps \
+    echo "Copying NLTK data and Tika server..." && \
+    cp -r /deps/nltk_data /root/ && \
+    cp /deps/tika-server-standard-3.0.0.jar /deps/tika-server-standard-3.0.0.jar.md5 /ragflow/ && \
+    cp /deps/cl100k_base.tiktoken /ragflow/9b5ad71b2ce5302211f9c61530b329a4922fc6a4 && \
+    echo "NLTK and Tika setup complete"
+
+ENV TIKA_SERVER_JAR="file:///ragflow/tika-server-standard-3.0.0.jar"
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Setup apt with comprehensive dependency comments and improved error handling
+RUN echo -e "\nLine 52\n"
+
+RUN set -ex && \
+    export DEBIAN_FRONTEND=noninteractive && \
+    echo "Configuring package sources..." && \
+    echo "Using default apt sources." && \
+    echo "Cleaning unnecessary apt lock files..." && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock && \
+    echo "Ensuring /tmp permissions..." && \
+    chmod 1777 /tmp && ls -ld /tmp && \
+    echo "Package source configuration complete."
+
+RUN echo "Line 64"
+
+RUN set -ex && \
+    echo "Updating package lists..." && \
+    apt-get update -yq && \
+    echo "Package lists updated."
+
+RUN set -ex && \
+    echo "Installing base packages..." && \
+    apt-get install -yq --no-install-recommends \
+        ca-certificates \
+        netcat && \
+    echo "Base packages installed."
+
+RUN set -ex && \
+    echo "Installing OpenCV dependencies..." && \
+    apt-get install -yq --no-install-recommends \
+        libglib2.0-0 \
+        libglx-mesa0 \
+        libgl1 && \
+    echo "OpenCV dependencies installed."
+
+RUN set -ex && \
+    echo "Installing Aspose-slides dependencies..." && \
+    apt-get install -yq --no-install-recommends \
+        pkg-config \
+        libicu-dev \
+        libgdiplus && \
+    echo "Aspose-slides dependencies installed."
+
+RUN set -ex && \
+    echo "Installing Python-pptx dependencies..." && \
+    apt-get install -yq --no-install-recommends \
+        default-jdk && \
+    echo "Python-pptx dependencies installed."
+
+RUN set -ex && \
+    echo "Installing Selenium dependencies..." && \
+    apt-get install -yq --no-install-recommends \
+        libatk-bridge2.0-0 && \
+    echo "Selenium dependencies installed."
+
+RUN set -ex && \
+    echo "Installing C extension dependencies..." && \
+    apt-get install -yq --no-install-recommends \
+        libpython3-dev \
+        libgtk-4-1 \
+        libnss3 \
+        xdg-utils \
+        libgbm-dev && \
+    echo "C extension dependencies installed."
+
+RUN set -ex && \
+    echo "Installing Memory optimization..." && \
+    apt-get install -yq --no-install-recommends \
+        libjemalloc-dev && \
+    echo "Memory optimization installed."
+
+RUN set -ex && \
+    echo "Installing Python tools..." && \
+    apt-get install -yq --no-install-recommends \
+        python3-pip \
+        pipx && \
+    echo "Python tools installed."
+
+RUN set -ex && \
+    echo "Installing Web server..." && \
+    apt-get install -yq --no-install-recommends \
+        nginx && \
+    echo "Web server installed."
+
+RUN set -ex && \
+    echo "Installing Utilities..." && \
+    apt-get install -yq --no-install-recommends \
+        unzip \
+        curl \
+        wget \
+        git \
+        vim \
+        less && \
+    echo "Utilities installed."
+
+RUN set -ex && \
+    echo "Cleaning up..." && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/* && \
+    echo "Base package installation completed successfully"
+
+# Configure Python environment and install uv
+RUN echo "Setting up Python environment..." && \
+    echo "Using default pip configuration." && \
+    echo "Installing uv package manager..." && \
+    pipx install uv && \
+    echo "Python environment setup complete"
+
+ENV PYTHONDONTWRITEBYTECODE=1 DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+ENV PATH=/root/.local/bin:$PATH
+
+# Install Node.js with progress indicators
+RUN echo "Adding NodeJS repository..." && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    echo "Removing old NodeJS packages..." && \
+    apt purge -y nodejs npm cargo && \
+    apt autoremove -y && \
+    echo "Updating package lists..." && \
+    apt update && \
+    echo "Installing NodeJS 20..." && \
+    apt install -y nodejs && \
+    echo "NodeJS $(node --version) installed successfully"
+
+# Install Rust with proper mirror configuration and progress tracking
+RUN echo "Installing build tools for Rust..." && \
+    apt update && apt install -y curl build-essential && \
+    echo "Using default Rust installation." && \
+    echo "Installing Rust compiler..." && \
+    curl --proto '=https' --tlsv1.2 --http1.1 -sSf https://sh.rustup.rs | bash -s -- -y --profile minimal && \
+    echo 'export PATH="/root/.cargo/bin:${PATH}"' >> /root/.bashrc && \
+    echo "Verifying Rust installation..."
+
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+RUN cargo --version && rustc --version && echo "Rust installed successfully"
+
+# Add MSSQL ODBC driver with architecture detection and improved progress tracking
+RUN echo "Adding Microsoft ODBC repositories..." && \
+    curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
+    curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list > /etc/apt/sources.list.d/mssql-release.list && \
+    apt update && \
+    arch="$(uname -m)" && \
+    echo "Detected architecture: $arch" && \
+    if [ "$arch" = "arm64" ] || [ "$arch" = "aarch64" ]; then \
+        echo "Installing ARM64 MSSQL ODBC drivers..." && \
+        ACCEPT_EULA=Y apt install -y unixodbc-dev msodbcsql18 && \
+        echo "ARM64 MSSQL ODBC driver installed"; \
+    else \
+        echo "Installing x86_64 MSSQL ODBC drivers..." && \
+        ACCEPT_EULA=Y apt install -y unixodbc-dev msodbcsql17 && \
+        echo "x86_64 MSSQL ODBC driver installed"; \
+    fi || \
+    { echo "Failed to install ODBC driver"; exit 1; }
+
+RUN echo -e "\nLine 206\n"
+
+# Add dependencies of selenium with better error handling
+RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/chrome-linux64-121-0-6167-85,target=/mounted-chrome.zip \
+    echo "Starting Chrome browser extraction..." && \
+    mkdir -p /tmp/chrome-extract /opt/chrome && \
+    ls -la /mounted-chrome.zip && \
+    echo "Copying zip file to temporary location..." && \
+    cp -v /mounted-chrome.zip /tmp/chrome.zip && \
+    echo "Extracting Chrome browser..." && \
+    cd /tmp/chrome-extract && \
+    unzip -q /tmp/chrome.zip || { echo "Unzip failed! Checking file integrity..."; ls -lah /tmp/chrome.zip; file /tmp/chrome.zip; exit 1; } && \
+    echo "Extraction successful. Contents:" && \
+    ls -la && \
+    echo "Moving to final location..." && \
+    cp -R chrome-linux64/* /opt/chrome/ && \
+    ln -sf /opt/chrome/chrome /usr/local/bin/ && \
+    echo "Cleaning up..." && \
+    rm -rf /tmp/chrome-extract /tmp/chrome.zip && \
+    echo "Chrome browser installed to /opt/chrome - checking binary:" && \
+    ls -la /opt/chrome/chrome
+
+RUN echo -e "\nLine 214\n"
+
+RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/chromedriver-linux64-121-0-6167-85,target=/chromedriver-linux64.zip \
+    echo "Installing Chrome WebDriver..." && \
+    unzip -j -q /chromedriver-linux64.zip chromedriver-linux64/chromedriver && \
+    mv chromedriver /usr/local/bin/ && \
+    rm -f /usr/bin/google-chrome && \
+    echo "Chrome WebDriver installed to /usr/local/bin/"
+
+# Install LibSSL to support aspose-slides with architecture detection
+RUN --mount=type=bind,from=infiniflow/ragflow_deps:latest,source=/,target=/deps \
+    echo "Installing LibSSL 1.1 for aspose-slides..." && \
+    if [ "$(uname -m)" = "x86_64" ]; then \
+        echo "Installing x86_64 version..." && \
+        dpkg -i /deps/libssl1.1_1.1.1f-1ubuntu2_amd64.deb && \
+        echo "LibSSL 1.1 (x86_64) installed"; \
+    elif [ "$(uname -m)" = "aarch64" ]; then \
+        echo "Installing ARM64 version..." && \
+        dpkg -i /deps/libssl1.1_1.1.1f-1ubuntu2_arm64.deb && \
+        echo "LibSSL 1.1 (ARM64) installed"; \
+    else \
+        echo "WARNING: Unknown architecture $(uname -m), LibSSL installation may fail"; \
+    fi
+
+# builder stage
+FROM base AS builder
+USER root
+WORKDIR /ragflow
+
+# Install dependencies from uv.lock file with timeout and better error reporting
+COPY pyproject.toml uv.lock ./
+
+RUN echo "Preparing dependency lock file..." && \
+    echo "Using default dependency sources." && \
+    echo "Installing Python dependencies with uv..." && \
+    if [ "$LIGHTEN" == "1" ]; then \
+        echo "Installing minimal package set..." && \
+        uv sync --python 3.10 --frozen; \
+    else \
+        echo "Installing full package set (this may take a while)..." && \
+        uv sync --python 3.10 --frozen --all-extras; \
+    fi && \
+    echo "Python dependencies installed successfully"
+
+# Build frontend with improved progress tracking
+COPY web web
+COPY docs docs
+RUN echo "Building frontend application..." && \
+    cd web && \
+    echo "Installing NPM dependencies..." && \
+    npm install && \
+    echo "Building web assets..." && \
+    npm run build && \
+    echo "Frontend build complete"
+
+# Extract version info more efficiently
+COPY .git /ragflow/.git
+RUN echo "Determining RagFlow version..." && \
+    version_info=$(git describe --tags --match=v* --first-parent --always 2>/dev/null || echo "unknown") && \
+    if [ "$LIGHTEN" == "1" ]; then \
+        version_info="$version_info slim"; \
+    else \
+        version_info="$version_info full"; \
+    fi && \
+    echo "RAGFlow version: $version_info" && \
+    echo $version_info > /ragflow/VERSION
+
+# production stage
+FROM base AS production
+USER root
+WORKDIR /ragflow
+
+# Copy Python environment and packages
+ENV VIRTUAL_ENV=/ragflow/.venv
+COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+ENV PYTHONPATH=/ragflow/
+
+# Copy application files
+COPY web web
+COPY api api
+COPY conf conf
+COPY deepdoc deepdoc
+COPY rag rag
+COPY agent agent
+COPY graphrag graphrag
+COPY agentic_reasoning agentic_reasoning
+COPY pyproject.toml uv.lock ./
+COPY docker/service_conf.yaml.template ./conf/service_conf.yaml.template
+COPY docker/entrypoint.sh docker/entrypoint-parser.sh ./
+RUN chmod +x ./entrypoint*.sh
+
+# Copy compiled web pages and version info
+COPY --from=builder /ragflow/web/dist /ragflow/web/dist
+COPY --from=builder /ragflow/VERSION /ragflow/VERSION
+
+# Add a health check for container monitoring
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8000/ || exit 1
+
+# Print version info on container start
+RUN echo "RAGFlow container built successfully. Version: $(cat /ragflow/VERSION)"
+
+ENTRYPOINT ["./entrypoint.sh"]
