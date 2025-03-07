@@ -15,7 +15,7 @@
     new_xgboost_line: "xgboost==1.6.0"
     old_line: "# MACOS=1"
     new_line: "MACOS=1"
-    dockerfile_mac_url: "git@github.com:electricramblers/Dockerfile.mac.git" # SSH URL
+    dockerfile_mac_url: "https://github.com/electricramblers/Dockerfile.mac.git"
     dockerfile_mac_dest: "{{ base_dir }}/Dockerfile.mac"
 
   tasks:
@@ -30,6 +30,7 @@
       when: playbook_dir | basename == "ragflow"
       tags:
         - compose
+        - clone
 
     - name: Check if running from the 'ragflow' directory
       fail:
@@ -274,17 +275,23 @@
         dest: "{{ base_dir }}/dockerfile_mac_repo"
         version: main # or the relevant branch
         force: yes
+      tags:
+        - clone
 
     - name: Copy Dockerfile.mac to the desired location
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/Dockerfile.mac"
         dest: "{{ base_dir }}/Dockerfile.mac"
         remote_src: yes
+      tags:
+        - clone
 
     - name: Clean up the cloned repository
       file:
         path: "{{ base_dir }}/dockerfile_mac_repo"
         state: absent
+      tags:
+        - clone
 
     - name: Build mac image
       command: "{{ container_engine }} build -f Dockerfile.mac -t infiniflow/ragflow:nightly {{ '--format docker' if container_engine == 'podman' else '' }} ."
