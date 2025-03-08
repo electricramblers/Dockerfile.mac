@@ -200,7 +200,7 @@
       tags:
         - clone
 
-    - name: Copy the service_conf.yaml.teamplate to the desired location.
+    - name: Copy the service_conf.yaml.template to the desired location.
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/service_conf.yaml.template"
         dest: "{{ base_dir }}/docker/service_conf.yaml.template"
