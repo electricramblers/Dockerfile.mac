@@ -13,7 +13,7 @@
     new_xgboost_line: "xgboost==1.6.0"
     old_line: "# MACOS=1"
     new_line: "MACOS=1"
-    lighten_line: "LIGHTEN=0" # Add the new line to add
+    lighten_line: "LIGHTEN=0"
     dockerfile_mac_url: "https://github.com/electricramblers/Dockerfile.mac.git"
     dockerfile_mac_dest: "{{ base_dir }}/Dockerfile.mac"
 
