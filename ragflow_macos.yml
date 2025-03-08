@@ -4,11 +4,11 @@
   gather_facts: true
   vars:
     base_dir: "{{ playbook_dir }}" # default to playbook directory, override if necessary
-    macos_compose_path: "{{ base_dir }}/docker/docker-compose-macos.yml"
-    main_compose_path: "{{ base_dir }}/docker/docker-compose.yml"
+    #macos_compose_path: "{{ base_dir }}/docker/docker-compose-macos.yml"
+    #main_compose_path: "{{ base_dir }}/docker/docker-compose.yml"
     pyproject_toml_path: "{{ base_dir }}/pyproject.toml"
     env_file_path: "{{ base_dir }}/docker/.env"
-    compose_file_path: "{{ base_dir }}/docker/docker-compose-macos.yml"
+    #compose_file_path: "{{ base_dir }}/docker/docker-compose-mac.yml"
     service_name: "ragflow"
     new_image_name: "infiniflow/ragflow:nightly"
     old_xgboost_line: "xgboost==1.5.0"
@@ -307,14 +307,14 @@
       tags:
         - clone
 
-    - name: Build mac image
+    - name: Build Ragflow image for MacOS
       command: "{{ container_engine }} build -f Dockerfile.mac -t infiniflow/ragflow:nightly {{ '--format docker' if container_engine == 'podman' else '' }} ."
       args:
         chdir: "{{ base_dir }}"
       register: mac_build_result
       ignore_errors: true
 
-    - name: Compose up - BASE
+    - name: Compose up - TOTAL
       command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml up -d"
       args:
         chdir: "{{ base_dir }}"
