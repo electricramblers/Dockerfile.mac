@@ -204,6 +204,9 @@
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/service_conf.yaml.template"
         dest: "{{ base_dir }}/docker/service_conf.yaml.template"
+        decrypt: yes
+      when:
+        - lookup('env', 'ANSIBLE_VAULT_PASSWORD_FILE') != ''
       tags:
         - clone
         - configure
