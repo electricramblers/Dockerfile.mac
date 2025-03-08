@@ -4,11 +4,8 @@
   gather_facts: true
   vars:
     base_dir: "{{ playbook_dir }}" # default to playbook directory, override if necessary
-    #macos_compose_path: "{{ base_dir }}/docker/docker-compose-macos.yml"
-    #main_compose_path: "{{ base_dir }}/docker/docker-compose.yml"
     pyproject_toml_path: "{{ base_dir }}/pyproject.toml"
     env_file_path: "{{ base_dir }}/docker/.env"
-    #compose_file_path: "{{ base_dir }}/docker/docker-compose-mac.yml"
     service_name: "ragflow"
     new_image_name: "infiniflow/ragflow:nightly"
     old_xgboost_line: "xgboost==1.5.0"
@@ -41,72 +38,6 @@
       pip:
         name: pyyaml
       register: yaml_install_result
-
-    #- name: Backup docker-compose-macos.yml
-    #  command: cp "{{ macos_compose_path }}" "{{ macos_compose_path }}.bak"
-
-    #- name: Backup docker-compose.yml
-    #  command: cp "{{ main_compose_path }}" "{{ main_compose_path }}.bak"
-    #
-    #- name: Comment out the extra_hosts line in docker-compose-macos.yml
-    #  lineinfile:
-    #    path: "{{ macos_compose_path }}"
-    #    regexp: '^\s*extra_hosts:'
-    #    line: "    # extra_hosts:"
-    #    backrefs: yes
-    #  when: ansible_os_family == "Darwin"
-    #  register: extra_hosts_result
-    #  check_mode: no
-    #
-    #- name: Modify dockerfile path in docker-compose-macos.yml
-    #  lineinfile:
-    #    path: "{{ macos_compose_path }}"
-    #    regexp: '^(\s*dockerfile:\s)Dockerfile$'
-    #    line: '\1Dockerfile.mac'
-    #    backrefs: yes
-    #  when: ansible_os_family == "Darwin"
-    #  register: dockerfile_update_result
-    #  check_mode: no
-    #
-    #- name: Comment out the host.docker.internal line in docker-compose-macos.yml
-    #  lineinfile:
-    #    path: "{{ macos_compose_path }}"
-    #    regexp: '^\s*- "?host.docker.internal:host-gateway"?'
-    #    line: '      # - "host.docker.internal:host-gateway"'
-    #    backrefs: yes
-    #  when: ansible_os_family == "Darwin"
-    #  register: host_gateway_result
-    #  check_mode: no
-
-    #- name: Report changes to docker-compose-macos.yml
-    #  debug:
-    #    msg: "Commented out lines in {{ macos_compose_path }}"
-    #  when: extra_hosts_result.changed or host_gateway_result.changed
-
-    #- name: Comment out the extra_hosts line in docker-compose.yml
-    #  lineinfile:
-    #    path: "{{ main_compose_path }}"
-    #    regexp: '^\s*extra_hosts:'
-    #    line: "    # extra_hosts:"
-    #    backrefs: yes
-    #  when: ansible_os_family == "Darwin"
-    #  register: main_extra_hosts_result
-    #  check_mode: no
-
-    #- name: Comment out the host.docker.internal line in docker-compose.yml
-    #  lineinfile:
-    #    path: "{{ main_compose_path }}"
-    #    regexp: '^\s*- "?host.docker.internal:host-gateway"?'
-    #    line: '      # - "host.docker.internal:host-gateway"'
-    #    backrefs: yes
-    #  when: ansible_os_family == "Darwin"
-    #  register: main_host_gateway_result
-    #  check_mode: no
-
-    #- name: Report changes to docker-compose.yml
-    #  debug:
-    #    msg: "Commented out lines in {{ main_compose_path }}"
-    #  when: main_extra_hosts_result.changed or main_host_gateway_result.changed
 
     - name: Determine container engine
       block:
@@ -200,41 +131,6 @@
       debug:
         msg: "Added {{ lighten_line }} to {{ env_file_path }}"
       when: lighten_result is changed
-
-    #- name: Update docker-compose.yml file.
-    #  block:
-    #    - name: Read docker-compose file
-    #      slurp:
-    #        path: "{{ compose_file_path }}"
-    #      register: compose_file_content
-    #    - name: Parse docker-compose yaml
-    #      set_fact:
-    #        compose_data: "{{ compose_file_content['content'] | b64decode | from_yaml }}"
-    #    - name: Debug compose data
-    #      debug:
-    #        var: compose_data
-    #        verbosity: 2
-    #    - name: Check if service exists
-    #      fail:
-    #        msg: "Service '{{ service_name }}' not found in {{ compose_file_path }}"
-    #      when: compose_data.services is not defined or compose_data.services[service_name] is not defined
-    #    - name: Check if image is already correct
-    #      set_fact:
-    #        image_is_correct: "{{ compose_data.services[service_name].image == new_image_name if compose_data.services[service_name].image is defined #else false }}"
-    #    - name: Update image if not correct
-    #      set_fact:
-    #        compose_data: "{{ compose_data | combine({ 'services': { service_name: { 'image': new_image_name } } }, recursive=True) }}"
-    #      when: not image_is_correct
-    #    - name: Write updated docker-compose file
-    #      copy:
-    #        content: "{{ compose_data | to_nice_yaml(indent=2) }}"
-    #        dest: "{{ compose_file_path }}"
-    #      when: not image_is_correct
-    #  rescue:
-    #    - name: Display error message
-    #      debug:
-    #        msg: "An error occurred while updating the docker-compose image."
-    #      failed_when: true
 
     - name: Change working directory
       changed_when: false
