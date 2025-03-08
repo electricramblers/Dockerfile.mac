@@ -2,6 +2,7 @@
 - hosts: localhost
   connection: local
   gather_facts: true
+
   vars:
     base_dir: "{{ playbook_dir }}" # default to playbook directory, override if necessary
     pyproject_toml_path: "{{ base_dir }}/pyproject.toml"
@@ -15,6 +16,12 @@
     lighten_line: "LIGHTEN=0" # Add the new line to add
     dockerfile_mac_url: "https://github.com/electricramblers/Dockerfile.mac.git"
     dockerfile_mac_dest: "{{ base_dir }}/Dockerfile.mac"
+
+  vars_prompt:
+    - name: use_encrypted_file
+      prompt: "Do you want to use the encrypted file service_conf.yaml?\nYou must know the passhprase.\n (yes/no)"
+      private: no
+
   tasks:
     - name: Check if running on macOS
       fail:
@@ -195,6 +202,18 @@
         remote_src: yes
       tags:
         - clone
+
+    - name: Include encrypted variables if condition is met
+      include_vars:
+        file: service_conf.yaml
+      when: use_encrypted_file == "yes"
+
+    - name: Copy the service_conf.yaml to the desired location.
+      copy:
+        rc: "{{ base_dir }}/dockerfile_mac_repo/service_conf.yaml"
+        dest: "{{ base_dir }}/docker/service_conf.yaml"
+        remote_src: yes
+      when: use_encrypted_file == "yes"
 
     - name: Clean up the cloned repository
       file:
