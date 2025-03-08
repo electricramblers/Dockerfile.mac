@@ -15,15 +15,14 @@
     new_xgboost_line: "xgboost==1.6.0"
     old_line: "# MACOS=1"
     new_line: "MACOS=1"
+    lighten_line: "LIGHTEN=0" # Add the new line to add
     dockerfile_mac_url: "https://github.com/electricramblers/Dockerfile.mac.git"
     dockerfile_mac_dest: "{{ base_dir }}/Dockerfile.mac"
-
   tasks:
     - name: Check if running on macOS
       fail:
         msg: "This playbook should only be run on macOS."
       when: ansible_os_family != "Darwin"
-
     - name: Set BASE_DIR if running from the 'ragflow' directory
       set_fact:
         base_dir: "{{ playbook_dir }}"
@@ -31,23 +30,18 @@
       tags:
         - compose
         - clone
-
     - name: Check if running from the 'ragflow' directory
       fail:
         msg: "The playbook is not being run from the 'ragflow' directory.\nYou need to run the playbook from within the 'ragflow' directory."
       when: base_dir | basename != "ragflow"
-
     - name: Install pyyaml
       pip:
         name: pyyaml
       register: yaml_install_result
-
     - name: Backup docker-compose-macos.yml
       command: cp "{{ macos_compose_path }}" "{{ macos_compose_path }}.bak"
-
     - name: Backup docker-compose.yml
       command: cp "{{ main_compose_path }}" "{{ main_compose_path }}.bak"
-
     - name: Comment out the extra_hosts line in docker-compose-macos.yml
       lineinfile:
         path: "{{ macos_compose_path }}"
@@ -57,7 +51,6 @@
       when: ansible_os_family == "Darwin"
       register: extra_hosts_result
       check_mode: no
-
     - name: Modify dockerfile path in docker-compose-macos.yml
       lineinfile:
         path: "{{ macos_compose_path }}"
@@ -67,7 +60,6 @@
       when: ansible_os_family == "Darwin"
       register: dockerfile_update_result
       check_mode: no
-
     - name: Comment out the host.docker.internal line in docker-compose-macos.yml
       lineinfile:
         path: "{{ macos_compose_path }}"
@@ -77,12 +69,10 @@
       when: ansible_os_family == "Darwin"
       register: host_gateway_result
       check_mode: no
-
     - name: Report changes to docker-compose-macos.yml
       debug:
         msg: "Commented out lines in {{ macos_compose_path }}"
       when: extra_hosts_result.changed or host_gateway_result.changed
-
     - name: Comment out the extra_hosts line in docker-compose.yml
       lineinfile:
         path: "{{ main_compose_path }}"
@@ -92,7 +82,6 @@
       when: ansible_os_family == "Darwin"
       register: main_extra_hosts_result
       check_mode: no
-
     - name: Comment out the host.docker.internal line in docker-compose.yml
       lineinfile:
         path: "{{ main_compose_path }}"
@@ -102,12 +91,10 @@
       when: ansible_os_family == "Darwin"
       register: main_host_gateway_result
       check_mode: no
-
     - name: Report changes to docker-compose.yml
       debug:
         msg: "Commented out lines in {{ main_compose_path }}"
       when: main_extra_hosts_result.changed or main_host_gateway_result.changed
-
     - name: Determine container engine
       block:
         - name: Check if podman is available
@@ -143,10 +130,8 @@
           failed_when: true
       tags:
         - compose
-
     - name: Backup pyproject.toml
       command: cp "{{ pyproject_toml_path }}" "{{ pyproject_toml_path }}.bak"
-
     - name: Update xgboost version in pyproject.toml
       replace:
         path: "{{ pyproject_toml_path }}"
@@ -159,17 +144,13 @@
         - new_xgboost_line is defined
       register: pyproject_toml_result
       check_mode: no
-
     #added to rename file
-
     - name: Report changes to pyproject.toml
       debug:
         msg: "Updated xgboost version in {{ pyproject_toml_path }}"
       when: pyproject_toml_result is changed
-
     - name: Backup .env file
       command: cp "{{ env_file_path }}" "{{ env_file_path }}.bak"
-
     - name: Enable MacOS mode in environment file
       replace:
         path: "{{ env_file_path }}"
@@ -182,42 +163,49 @@
         - new_line is defined
       register: env_file_result
       check_mode: no
-
-    - name: Report changes to environment file
+    - name: Add LIGHTEN=0 to environment file
+      lineinfile:
+        path: "{{ env_file_path }}"
+        line: "{{ lighten_line }}"
+        insertafter: EOF
+      when:
+        - ansible_os_family == "Darwin"
+        - env_file_path is defined
+        - lighten_line is defined
+      register: lighten_result
+      check_mode: no
+    - name: Report changes to environment file for MACOS setting
       debug:
         msg: "Enabled MacOS mode in {{ env_file_path }}"
       when: env_file_result is changed
-
+    - name: Report changes to environment file for LIGHTEN setting
+      debug:
+        msg: "Added {{ lighten_line }} to {{ env_file_path }}"
+      when: lighten_result is changed
     - name: Update docker-compose.yml file.
       block:
         - name: Read docker-compose file
           slurp:
             path: "{{ compose_file_path }}"
           register: compose_file_content
-
         - name: Parse docker-compose yaml
           set_fact:
             compose_data: "{{ compose_file_content['content'] | b64decode | from_yaml }}"
-
         - name: Debug compose data
           debug:
             var: compose_data
             verbosity: 2
-
         - name: Check if service exists
           fail:
             msg: "Service '{{ service_name }}' not found in {{ compose_file_path }}"
           when: compose_data.services is not defined or compose_data.services[service_name] is not defined
-
         - name: Check if image is already correct
           set_fact:
             image_is_correct: "{{ compose_data.services[service_name].image == new_image_name if compose_data.services[service_name].image is defined else false }}"
-
         - name: Update image if not correct
           set_fact:
             compose_data: "{{ compose_data | combine({ 'services': { service_name: { 'image': new_image_name } } }, recursive=True) }}"
           when: not image_is_correct
-
         - name: Write updated docker-compose file
           copy:
             content: "{{ compose_data | to_nice_yaml(indent=2) }}"
@@ -228,12 +216,10 @@
           debug:
             msg: "An error occurred while updating the docker-compose image."
           failed_when: true
-
     - name: Change working directory
       changed_when: false
       command: pwd
       register: pwd_result
-
     - name: Set fact that we are in the correct directory
       changed_when: false
       set_fact:
@@ -242,32 +228,27 @@
         - ansible_os_family == "Darwin"
         - base_dir is defined
         - pwd_result is defined
-
     - name: Change directory to base_dir
       command: chdir "{{ base_dir }}"
       args:
         chdir: "{{ base_dir }}"
       when: not current_directory_is_correct
-
     - name: Install huggingface_hub and nltk
       pip:
         name: "{{ item }}"
       loop:
         - huggingface_hub
         - nltk
-
     - name: Download dependencies
       command: python download_deps.py
       args:
         chdir: "{{ base_dir }}"
-
     - name: Build dependencies image
       command: "{{ container_engine }} build -f Dockerfile.deps -t infiniflow/ragflow_deps {{ '--format docker' if container_engine == 'podman' else '' }} ."
       args:
         chdir: "{{ base_dir }}"
       register: deps_build_result
       ignore_errors: true
-
     # Tasks to retrieve Dockerfile.mac from private repository
     - name: Ensure repository is cloned
       git:
@@ -277,7 +258,6 @@
         force: yes
       tags:
         - clone
-
     - name: Copy Dockerfile.mac to the desired location
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/Dockerfile.mac"
@@ -285,14 +265,12 @@
         remote_src: yes
       tags:
         - clone
-
     - name: Clean up the cloned repository
       file:
         path: "{{ base_dir }}/dockerfile_mac_repo"
         state: absent
       tags:
         - clone
-
     - name: Build mac image
       command: "{{ container_engine }} build -f Dockerfile.mac -t infiniflow/ragflow:nightly {{ '--format docker' if container_engine == 'podman' else '' }} ."
       args:
@@ -300,13 +278,19 @@
       register: mac_build_result
       ignore_errors: true
 
-    - name: Compose up
-      command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-macos.yml up -d"
+    - name: Compose up - BASE
+      command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-base.yml up -d"
       args:
         chdir: "{{ base_dir }}"
       tags:
         - compose
 
+    - name: Compose up - MACOS
+      command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-macos.yml up -d"
+      args:
+        chdir: "{{ base_dir }}"
+      tags:
+        - compose
     - name: Final message
       debug:
         msg: "RagFlow has been successfully installed and started on your MacOS system. Access the web UI at http://localhost"
