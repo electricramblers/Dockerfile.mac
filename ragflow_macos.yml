@@ -17,11 +17,6 @@
     dockerfile_mac_url: "https://github.com/electricramblers/Dockerfile.mac.git"
     dockerfile_mac_dest: "{{ base_dir }}/Dockerfile.mac"
 
-  vars_prompt:
-    - name: use_encrypted_file
-      prompt: "Do you want to use the encrypted file service_conf.yaml?\nYou must know the passhprase.\n (yes/no)"
-      private: no
-
   tasks:
     - name: Check if running on macOS
       fail:
@@ -81,6 +76,7 @@
           failed_when: true
       tags:
         - compose
+        - configure
 
     - name: Backup pyproject.toml
       command: cp "{{ pyproject_toml_path }}" "{{ pyproject_toml_path }}.bak"
@@ -186,6 +182,7 @@
         force: yes
       tags:
         - clone
+        - configure
 
     - name: Copy Dockerfile.mac to the desired location
       copy:
@@ -203,17 +200,13 @@
       tags:
         - clone
 
-    - name: Include encrypted variables if condition is met
-      include_vars:
-        file: service_conf.yaml
-      when: use_encrypted_file == "yes"
-
     - name: Copy the service_conf.yaml to the desired location.
       copy:
-        rc: "{{ base_dir }}/dockerfile_mac_repo/service_conf.yaml"
+        src: "{{ base_dir }}/dockerfile_mac_repo/service_conf.yaml"
         dest: "{{ base_dir }}/docker/service_conf.yaml"
-        remote_src: yes
-      when: use_encrypted_file == "yes"
+      tags:
+        - clone
+        - configure
 
     - name: Clean up the cloned repository
       file:
@@ -221,6 +214,7 @@
         state: absent
       tags:
         - clone
+        - configure
 
     - name: Build Ragflow image for MacOS
       command: "{{ container_engine }} build -f Dockerfile.mac -t infiniflow/ragflow:nightly {{ '--format docker' if container_engine == 'podman' else '' }} ."
@@ -235,6 +229,7 @@
         chdir: "{{ base_dir }}"
       tags:
         - compose
+        - configure
 
     - name: Final message
       debug:
