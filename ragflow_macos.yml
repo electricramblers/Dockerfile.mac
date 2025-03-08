@@ -165,6 +165,7 @@
       when: pyproject_toml_result is changed
     - name: Backup .env file
       command: cp "{{ env_file_path }}" "{{ env_file_path }}.bak"
+
     - name: Enable MacOS mode in environment file
       replace:
         path: "{{ env_file_path }}"
@@ -177,6 +178,7 @@
         - new_line is defined
       register: env_file_result
       check_mode: no
+
     - name: Add LIGHTEN=0 to environment file
       lineinfile:
         path: "{{ env_file_path }}"
@@ -188,52 +190,57 @@
         - lighten_line is defined
       register: lighten_result
       check_mode: no
+
     - name: Report changes to environment file for MACOS setting
       debug:
         msg: "Enabled MacOS mode in {{ env_file_path }}"
       when: env_file_result is changed
+
     - name: Report changes to environment file for LIGHTEN setting
       debug:
         msg: "Added {{ lighten_line }} to {{ env_file_path }}"
       when: lighten_result is changed
-    - name: Update docker-compose.yml file.
-      block:
-        - name: Read docker-compose file
-          slurp:
-            path: "{{ compose_file_path }}"
-          register: compose_file_content
-        - name: Parse docker-compose yaml
-          set_fact:
-            compose_data: "{{ compose_file_content['content'] | b64decode | from_yaml }}"
-        - name: Debug compose data
-          debug:
-            var: compose_data
-            verbosity: 2
-        - name: Check if service exists
-          fail:
-            msg: "Service '{{ service_name }}' not found in {{ compose_file_path }}"
-          when: compose_data.services is not defined or compose_data.services[service_name] is not defined
-        - name: Check if image is already correct
-          set_fact:
-            image_is_correct: "{{ compose_data.services[service_name].image == new_image_name if compose_data.services[service_name].image is defined else false }}"
-        - name: Update image if not correct
-          set_fact:
-            compose_data: "{{ compose_data | combine({ 'services': { service_name: { 'image': new_image_name } } }, recursive=True) }}"
-          when: not image_is_correct
-        - name: Write updated docker-compose file
-          copy:
-            content: "{{ compose_data | to_nice_yaml(indent=2) }}"
-            dest: "{{ compose_file_path }}"
-          when: not image_is_correct
-      rescue:
-        - name: Display error message
-          debug:
-            msg: "An error occurred while updating the docker-compose image."
-          failed_when: true
+
+    #- name: Update docker-compose.yml file.
+    #  block:
+    #    - name: Read docker-compose file
+    #      slurp:
+    #        path: "{{ compose_file_path }}"
+    #      register: compose_file_content
+    #    - name: Parse docker-compose yaml
+    #      set_fact:
+    #        compose_data: "{{ compose_file_content['content'] | b64decode | from_yaml }}"
+    #    - name: Debug compose data
+    #      debug:
+    #        var: compose_data
+    #        verbosity: 2
+    #    - name: Check if service exists
+    #      fail:
+    #        msg: "Service '{{ service_name }}' not found in {{ compose_file_path }}"
+    #      when: compose_data.services is not defined or compose_data.services[service_name] is not defined
+    #    - name: Check if image is already correct
+    #      set_fact:
+    #        image_is_correct: "{{ compose_data.services[service_name].image == new_image_name if compose_data.services[service_name].image is defined #else false }}"
+    #    - name: Update image if not correct
+    #      set_fact:
+    #        compose_data: "{{ compose_data | combine({ 'services': { service_name: { 'image': new_image_name } } }, recursive=True) }}"
+    #      when: not image_is_correct
+    #    - name: Write updated docker-compose file
+    #      copy:
+    #        content: "{{ compose_data | to_nice_yaml(indent=2) }}"
+    #        dest: "{{ compose_file_path }}"
+    #      when: not image_is_correct
+    #  rescue:
+    #    - name: Display error message
+    #      debug:
+    #        msg: "An error occurred while updating the docker-compose image."
+    #      failed_when: true
+
     - name: Change working directory
       changed_when: false
       command: pwd
       register: pwd_result
+
     - name: Set fact that we are in the correct directory
       changed_when: false
       set_fact:
@@ -242,21 +249,25 @@
         - ansible_os_family == "Darwin"
         - base_dir is defined
         - pwd_result is defined
+
     - name: Change directory to base_dir
       command: chdir "{{ base_dir }}"
       args:
         chdir: "{{ base_dir }}"
       when: not current_directory_is_correct
+
     - name: Install huggingface_hub and nltk
       pip:
         name: "{{ item }}"
       loop:
         - huggingface_hub
         - nltk
+
     - name: Download dependencies
       command: python download_deps.py
       args:
         chdir: "{{ base_dir }}"
+
     - name: Build dependencies image
       command: "{{ container_engine }} build -f Dockerfile.deps -t infiniflow/ragflow_deps {{ '--format docker' if container_engine == 'podman' else '' }} ."
       args:
@@ -295,6 +306,7 @@
         state: absent
       tags:
         - clone
+
     - name: Build mac image
       command: "{{ container_engine }} build -f Dockerfile.mac -t infiniflow/ragflow:nightly {{ '--format docker' if container_engine == 'podman' else '' }} ."
       args:
@@ -303,18 +315,12 @@
       ignore_errors: true
 
     - name: Compose up - BASE
-      command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-base.yml up -d"
+      command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml up -d"
       args:
         chdir: "{{ base_dir }}"
       tags:
         - compose
 
-    - name: Compose up - MACOS
-      command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-macos.yml up -d"
-      args:
-        chdir: "{{ base_dir }}"
-      tags:
-        - compose
     - name: Final message
       debug:
         msg: "RagFlow has been successfully installed and started on your MacOS system. Access the web UI at http://localhost"

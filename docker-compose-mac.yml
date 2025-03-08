@@ -133,3 +133,4 @@ volumes:
 
 networks:
   ragflow:
+    -name: ragflow
