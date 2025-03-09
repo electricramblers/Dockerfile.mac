@@ -1,12 +1,10 @@
+#!/usr/bin/env python3
 
 ## Configuration
-
-Explain the different configuration options available and how to modify them.
+# Explain the different configuration options available and how to modify them.
 
 ## Contributing
-
-Explain how others can contribute to the project.
+# Explain how others can contribute to the project.
 
 ## License
-
-Specify the license under which the project is released.
+# Specify the license under which the project is released.
