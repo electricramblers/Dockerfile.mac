@@ -16,6 +16,8 @@
     lighten_line: "LIGHTEN=0"
     dockerfile_mac_url: "https://github.com/electricramblers/Dockerfile.mac.git"
     dockerfile_mac_dest: "{{ base_dir }}/Dockerfile.mac"
+    docker_volume_path: "{{ ansible_env.HOME }}/volumes/rf"
+    env_volume_line: "DOCKER_VOLUME_DIRECTORY={{ docker_volume_path }}"
 
   tasks:
     - name: Check if running on macOS
@@ -97,6 +99,7 @@
       debug:
         msg: "Updated xgboost version in {{ pyproject_toml_path }}"
       when: pyproject_toml_result is changed
+
     - name: Backup .env file
       command: cp "{{ env_file_path }}" "{{ env_file_path }}.bak"
 
@@ -123,6 +126,18 @@
         - env_file_path is defined
         - lighten_line is defined
       register: lighten_result
+      check_mode: no
+
+    - name: Add DOCKER_VOLUME_DIRECTORY to environment file
+      lineinfile:
+        path: "{{ env_file_path }}"
+        line: "{{ env_volume_line }}"
+        insertafter: EOF
+      when:
+        - ansible_os_family == "Darwin"
+        - env_file_path is defined
+        - env_volume_line is defined
+      register: volume_result
       check_mode: no
 
     - name: Report changes to environment file for MACOS setting

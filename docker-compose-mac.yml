@@ -3,7 +3,7 @@ services:
     container_name: ragflow-es-01
     image: elasticsearch:${STACK_VERSION}
     volumes:
-      - esdata01:/usr/share/elasticsearch/data
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/elasticsearch:/usr/share/elasticsearch/data
     ports:
       - ${ES_PORT}:9200
     env_file: .env
@@ -50,8 +50,8 @@ services:
     ports:
       - ${MYSQL_PORT}:3306
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./init.sql:/data/application/init.sql
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/mysql:/var/lib/mysql
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/mysql/init.sql:/data/application/init.sql
     networks:
       - ragflow
     healthcheck:
@@ -74,7 +74,7 @@ services:
       - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD}
       - TZ=${TIMEZONE}
     volumes:
-      - minio_data:/data
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/minio:/data
     networks:
       - ragflow
     restart: on-failure
@@ -87,7 +87,7 @@ services:
     ports:
       - ${REDIS_PORT}:6379
     volumes:
-      - redis_data:/data
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/redis:/data
     networks:
       - ragflow
     restart: on-failure
@@ -119,47 +119,6 @@ services:
       - ./nginx/ragflow.conf:/etc/nginx/conf.d/ragflow.conf
       - ./nginx/proxy.conf:/etc/nginx/proxy.conf
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-
-volumes:
-  esdata01:
-    driver: local
-    driver_opts:
-      type: none
-      device: ${HOME}/volumes/rf/esdata01
-      o: bind
-
-  mysql_data:
-    driver: local
-    driver_opts:
-      type: none
-      device: ${HOME}/volumes/rf/mysql_data
-      o: bind
-
-  minio_data:
-    driver: local
-    driver_opts:
-      type: none
-      device: ${HOME}/volumes/rf/minio_data
-      o: bind
-
-  redis_data:
-    driver: local
-    driver_opts:
-      type: none
-      device: ${HOME}/volumes/rf/redis_data
-      o: bind
-
-#volumes:
-#  esdata01:
-#    driver: local
-#  infinity_data:
-#    driver: local
-#  mysql_data:
-#    driver: local
-#  minio_data:
-#    driver: local
-#  redis_data:
-#    driver: local
 
 networks:
   ragflow:
