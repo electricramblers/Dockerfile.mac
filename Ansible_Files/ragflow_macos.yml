@@ -220,7 +220,7 @@
 
     - name: Copy Dockerfile.mac to the desired location
       copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/Dockerfile.mac"
+        src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/Dockerfile.mac"
         dest: "{{ base_dir }}/Dockerfile.mac"
         remote_src: yes
       tags:
@@ -228,7 +228,7 @@
 
     - name: Copy docker-compose-mac.yml to the desired location
       copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/docker-compose-mac.yml"
+        src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/docker-compose-mac.yml"
         dest: "{{ base_dir }}/docker/docker-compose-mac.yml"
         remote_src: yes
       tags:
@@ -237,7 +237,7 @@
 
     - name: Copy the service_conf.yaml.template to the desired location.
       copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/service_conf.yaml.template"
+        src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/service_conf.yaml.template"
         dest: "{{ base_dir }}/docker/service_conf.yaml.template"
         decrypt: yes
       when:
