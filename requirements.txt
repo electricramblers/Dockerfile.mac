@@ -2,3 +2,4 @@ ragflow-sdk
 termcolor
 python-dotenv
 ansible-vault
+docling
