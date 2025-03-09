@@ -14,6 +14,8 @@
     old_line: "# MACOS=1"
     new_line: "MACOS=1"
     lighten_line: "LIGHTEN=0"
+    original_time_zone: "TIMEZONE='Asia/Shanghai'"
+    new_time_zone: "TIMEZONE=America/Denver"
     dockerfile_mac_url: "https://github.com/electricramblers/Dockerfile.mac.git"
     dockerfile_mac_dest: "{{ base_dir }}/Dockerfile.mac"
     docker_volume_path: "{{ ansible_env.HOME }}/volumes/rf"
@@ -102,6 +104,19 @@
 
     - name: Backup .env file
       command: cp "{{ env_file_path }}" "{{ env_file_path }}.bak"
+
+    - name: Set time zone in environment file
+      replace:
+        path: "{{ env_file_path }}"
+        regexp: "{{ original_time_zone }}"
+        replace: "{{ new_time_zone }}"
+      when:
+        - ansible_os_family == "Darwin"
+        - env_file_path is defined
+        - old_line is defined
+        - new_line is defined
+      register: time_zone_result
+      check_mode: no
 
     - name: Enable MacOS mode in environment file
       replace:
