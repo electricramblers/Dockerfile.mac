@@ -123,14 +123,43 @@ services:
 volumes:
   esdata01:
     driver: local
-  infinity_data:
-    driver: local
+    driver_opts:
+      type: none
+      device: ${HOME}/volumes/rf/esdata01
+      o: bind
+
   mysql_data:
     driver: local
+    driver_opts:
+      type: none
+      device: ${HOME}/volumes/rf/mysql_data
+      o: bind
+
   minio_data:
     driver: local
+    driver_opts:
+      type: none
+      device: ${HOME}/volumes/rf/minio_data
+      o: bind
+
   redis_data:
     driver: local
+    driver_opts:
+      type: none
+      device: ${HOME}/volumes/rf/redis_data
+      o: bind
+
+#volumes:
+#  esdata01:
+#    driver: local
+#  infinity_data:
+#    driver: local
+#  mysql_data:
+#    driver: local
+#  minio_data:
+#    driver: local
+#  redis_data:
+#    driver: local
 
 networks:
   ragflow:
