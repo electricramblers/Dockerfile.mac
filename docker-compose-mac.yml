@@ -51,7 +51,7 @@ services:
       - ${MYSQL_PORT}:3306
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/mysql:/var/lib/mysql
-      - .init.sql:/data/application/init.sql
+      - ./init.sql:/data/application/init.sql
     networks:
       - ragflow
     healthcheck:
