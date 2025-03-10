@@ -3,6 +3,7 @@ import os
 import fnmatch
 import hashlib
 import json
+from pkgutil import get_data
 import random
 import requests
 import sys
@@ -32,7 +33,7 @@ FILE_STATE_PATH = "file_state.json"
 EMBEDDING_MODEL = "nomic-embed-text"
 CHUNK_METHOD = "naive"  # same as general
 CHUNK_TOKEN_NUMBER = 512
-
+NEW_PARSER_CONFIG = {"chunk_token_num": 512, "delimiter": "\\n!?;。;!?"}
 
 # -------------------------------------------------------------------------------
 # HTTP API STUFF
@@ -58,15 +59,8 @@ def create_dataset(
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
     data = {
         "name": dataset_name,
-        "chunk_method": "naive",
+        "chunk_method": chunk_method,
         "embedding_model": embedding_model,
-        "parser_config": {
-            "chunk_token_num": chunk_token_number,
-            "delimiter": "\\n!?;。;!?",
-            "html4excel": False,
-            "layout_recognize": True,
-            "raptor": {"user_raptor": False},
-        },
     }
 
     try:
@@ -79,6 +73,108 @@ def create_dataset(
             print(f"Response Status Code: {response.status_code}")
             print(f"Response Content: {response.text}")
         return None
+
+
+def get_dataset_id_by_name(base_url, api_key, dataset_name):
+    """
+    Retrieves the dataset ID by its name.
+
+    Args:
+        base_url (str): The base URL of the API.
+        api_key (str): The API key for authorization.
+        dataset_name (str): The name of the dataset to search for.
+
+    Returns:
+        str: The dataset ID if found, or None if not found or an error occurred.
+    """
+    url = f"http://{base_url}/api/v1/datasets?name={dataset_name}"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        if data["code"] == 0 and data["data"]:
+            # Assuming the API returns a list of datasets matching the name
+            # Here we return the first dataset ID in the list.
+            # You might want a more robust way to handle multiple matches.
+            return data["data"][0]["id"]
+        else:
+            print(f"Dataset with name '{dataset_name}' not found.")
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+        if "response" in locals() and response is not None:
+            print(f"Response Status Code: {response.status_code}")
+            print(f"Response Content: {response.text}")
+        return None
+
+
+def update_dataset(base_url, api_key, dataset_name, new_name=None):
+    """
+    Updates a dataset's name by first looking up the dataset ID using the dataset name.
+
+    Args:
+        base_url (str): The base URL of the API.
+        api_key (str): The API key for authorization.
+        dataset_name (str): The current name of the dataset to be updated.
+        new_name (str, optional): The new name of the dataset. Defaults to None.
+
+    Returns:
+        dict: The JSON response from the API, or None if an error occurred.
+    """
+    dataset_id = get_dataset_id_by_name(base_url, api_key, dataset_name)
+    if not dataset_id:
+        print(f"Could not find dataset ID for name '{dataset_name}'.")
+        return None
+
+    url = f"http://{base_url}/api/v1/datasets/{dataset_id}"
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+    data = {}
+    if new_name:
+        data["name"] = new_name
+
+    if not data:
+        print("No update parameters provided.")
+        return None
+
+    try:
+        response = requests.put(url, headers=headers, data=json.dumps(data))
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+        if "response" in locals() and response is not None:
+            print(f"Response Status Code: {response.status_code}")
+            print(f"Response Content: {response.text}")
+        return None
+
+
+def modify_parser(base_url, api_key, chunk_token_value, dataset_id):
+    url = f"http://{base_url}/api/v1/datasets/{dataset_id}"
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+    data = {
+        "parser_config": {
+            "chunk_token_num": chunk_token_value,  # Your desired value
+            "delimiter": "\\n!?;。;!?",  # Keep other existing config values
+        }
+    }
+    try:
+        response = requests.put(url, headers=headers, data=json.dumps(data))
+        response.raise_for_status()
+        result = response.json()
+
+        if result.get("code") == 0:
+            cprint("Dataset parser_config updated successfully!", "green")
+        else:
+            cprint(
+                f"Error updating dataset parser_config: {result.get('message')}", "red"
+            )
+
+    except requests.exceptions.RequestException as e:
+        cprint(f"An error occurred during the API request: {e}", "red")
+        if hasattr(e, "response") and e.response:
+            cprint(f"Response Status Code: {e.response.status_code}", "light_red")
+            cprint(f"Response Text: {e.response.text}", "light_red")
 
 
 # -------------------------------------------------------------------------------
@@ -160,6 +256,11 @@ def main():
     else:
         cprint("Dataset creation failed.", "red")
 
+    DATASET_ID = get_dataset_id_by_name(BASE_URL, API_KEY, DATASET)
+
+    modify_parser(BASE_URL, API_KEY, CHUNK_TOKEN_NUMBER, DATASET_ID)
+
+    sys.exit()
     files = get_files_with_extensions(IMPORT_DIR, FILE_EXTENSIONS)
     file_state = load_file_state()  # Load file state _before_ the loop
 
