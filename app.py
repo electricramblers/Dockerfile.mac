@@ -4,31 +4,86 @@ import fnmatch
 import hashlib
 import json
 import random
+import requests
 import sys
 from ansible.parsing.vault import get_file_vault_secret
 from termcolor import cprint, colored
 from src.RetrieveRfApi import retrieve_ragflow_api_key
-from ragflow_sdk import RAGFlow
-from ragflow_sdk.modules.dataset import DataSet
+
 from time import sleep
 
 DATASET = "logseq_dataset"
 API_KEY = retrieve_ragflow_api_key()
 IMPORT_DIR = os.path.expandvars("${HOME}/LLM_RAG/Logseq")
-BASE_URL = "http://localhost:8989"
-FILE_EXTENSIONS = [".md", ".txt", ".docx", ".pptx", ".xlsx"]
+BASE_URL = "localhost:8989"
+FILE_EXTENSIONS = [
+    ".md",
+    ".txt",
+    ".docx",
+    ".pptx",
+    ".xlsx",
+    ".eml",
+    ".json",
+    ".htm",
+    ".html",
+]
 FILE_STATE_PATH = "file_state.json"
 # EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-aL6-v2"
 EMBEDDING_MODEL = "nomic-embed-text"
 CHUNK_METHOD = "naive"  # same as general
 CHUNK_TOKEN_NUMBER = 512
-PARSER_CONFIG = {
-    "chunk_token_num": CHUNK_TOKEN_NUMBER,
-    "delimiter": "\\n!?;。;!?",
-    "html4excel": False,
-    "layout_recognize": True,
-    "raptor": {"user_raptor": False},
-}
+
+
+# -------------------------------------------------------------------------------
+# HTTP API STUFF
+# -------------------------------------------------------------------------------
+
+
+def create_dataset(
+    base_url, api_key, dataset_name, embedding_model, chunk_method, chunk_token_number
+):
+    """
+    Creates a dataset using the provided parameters via a Python request.
+
+    Args:
+        base_url (str): The base URL of the API.
+        api_key (str): The API key for authorization.
+        dataset_name (str): The name of the dataset to be created.
+        chunk_token_number (int): The chunk token number for the parser configuration.
+
+    Returns:
+        dict: The JSON response from the API, or None if an error occurred.
+    """
+    url = f"http://{base_url}/api/v1/datasets"
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+    data = {
+        "name": dataset_name,
+        "chunk_method": "naive",
+        "embedding_model": embedding_model,
+        "parser_config": {
+            "chunk_token_num": chunk_token_number,
+            "delimiter": "\\n!?;。;!?",
+            "html4excel": False,
+            "layout_recognize": True,
+            "raptor": {"user_raptor": False},
+        },
+    }
+
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+        if "response" in locals() and response is not None:
+            print(f"Response Status Code: {response.status_code}")
+            print(f"Response Content: {response.text}")
+        return None
+
+
+# -------------------------------------------------------------------------------
+# Get Files
+# -------------------------------------------------------------------------------
 
 
 def get_files_with_extensions(directory, file_extensions):
@@ -39,6 +94,11 @@ def get_files_with_extensions(directory, file_extensions):
                 absolute_path = os.path.abspath(os.path.join(root, file))
                 matching_files.append(absolute_path)
     return matching_files
+
+
+# -------------------------------------------------------------------------------
+# File State
+# -------------------------------------------------------------------------------
 
 
 def calculate_sha1(file_path):
@@ -84,68 +144,24 @@ def save_file_state(file_state, file_path=FILE_STATE_PATH):
         cprint(f"Error saving file state to {file_path}: {e}", "red")
 
 
+# -------------------------------------------------------------------------------
+# HERE BE DRAGONS
+# -------------------------------------------------------------------------------
+
+
 def main():
-    IDS = []
-    # -------------------------------------------------------------------------------
-    # Create Datast
-    # -------------------------------------------------------------------------------
-    client = RAGFlow(api_key=f"{API_KEY}", base_url=BASE_URL)
-    try:
-        dataset = client.create_dataset(
-            name=f"{DATASET}",
-            embedding_model=EMBEDDING_MODEL,
-            chunk_method=CHUNK_METHOD,
-            parser_config=DataSet.ParserConfig(**PARSER_CONFIG),
-        )
-    except Exception as e:
-        print(f"Error creating dataset: {e}")
-        datasets = client.list_datasets(name=f"{DATASET}")
-        if datasets:
-            dataset = datasets[0]
-        else:
-            print("No datasets found, exiting.")
-            return
+
+    response_data = create_dataset(
+        BASE_URL, API_KEY, DATASET, EMBEDDING_MODEL, CHUNK_METHOD, CHUNK_TOKEN_NUMBER
+    )
+    if response_data:
+        cprint("Dataset creation successful!", "green")
+        # print("Response:", json.dumps(response_data, indent=4))
+    else:
+        cprint("Dataset creation failed.", "red")
 
     files = get_files_with_extensions(IMPORT_DIR, FILE_EXTENSIONS)
     file_state = load_file_state()  # Load file state _before_ the loop
-
-    for file in files:
-        file_name = os.path.basename(file)
-        file_hash = calculate_sha1(file)
-
-        if file_hash is None:
-            cprint(f"Skipping {file_name} due to hashing error.", "red")
-            continue
-
-        if file in file_state and file_state[file] == file_hash:
-            cprint(f"Skipping duplicate file: {file_name}", "yellow")
-            continue
-
-        try:
-            with open(file, "rb") as f:
-                file_content = f.read()
-        except Exception as e:
-            cprint(f"Error reading file {file_name}: {e}", "red")
-            continue  # Skip to the next file
-
-        try:
-            cprint(f"Uploading file: {file_name}", "green")
-            dataset.upload_documents(
-                [
-                    {
-                        "display_name": f"{file_name}",
-                        "blob": file_content.decode(
-                            "utf-8", "ignore"
-                        ),  # Decode bytes to string
-                    },
-                ]
-            )
-            file_state[file] = file_hash  # Update state _after_ successful upload
-            save_file_state(file_state)
-
-        except Exception as e:
-            cprint(f"Error uploading file {file_name}: {e}", "red")
-            continue  # Skip to the next file
 
     print("Finished processing files.")
 
