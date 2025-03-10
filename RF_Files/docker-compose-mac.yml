@@ -111,7 +111,7 @@ services:
       - ragflow
     ports:
       - ${SVR_HTTP_PORT}:9380
-      - 80:80
+      - 8989:80
       - 443:443
     restart: on-failure
     volumes:
