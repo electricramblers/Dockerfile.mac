@@ -34,6 +34,7 @@
       tags:
         - compose
         - clone
+        - rebuild
 
     - name: Check if running from the 'ragflow' directory
       fail:
@@ -81,6 +82,7 @@
       tags:
         - compose
         - configure
+        - rebuild
 
     - name: Backup pyproject.toml
       command: cp "{{ pyproject_toml_path }}" "{{ pyproject_toml_path }}.bak"
@@ -260,6 +262,8 @@
         chdir: "{{ base_dir }}"
       register: mac_build_result
       ignore_errors: true
+      tags:
+        - rebuild
 
     - name: Compose up - TOTAL
       command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml up -d"
@@ -268,6 +272,7 @@
       tags:
         - compose
         - configure
+        - rebuild
 
     - name: Final message
       debug:

@@ -1,93 +1,153 @@
 #!/usr/bin/env python
 import os
 import fnmatch
+import hashlib
+import json
+import random
+import sys
 from ansible.parsing.vault import get_file_vault_secret
 from termcolor import cprint, colored
 from src.RetrieveRfApi import retrieve_ragflow_api_key
 from ragflow_sdk import RAGFlow
+from ragflow_sdk.modules.dataset import DataSet
 from time import sleep
 
-_dataset = "logseq_dataset"
-_rf_api_key = retrieve_ragflow_api_key()
-_importDir = os.path.expandvars("${HOME}/LLM_RAG/Logseq")
-_base_url = "http://localhost"
-_fileExtensions = [
-    ".md",
-    ".txt",
-]
+DATASET = "logseq_dataset"
+API_KEY = retrieve_ragflow_api_key()
+IMPORT_DIR = os.path.expandvars("${HOME}/LLM_RAG/Logseq")
+BASE_URL = "http://localhost"
+FILE_EXTENSIONS = [".md", ".txt", ".docx", ".pptx", ".xlsx"]
+FILE_STATE_PATH = "file_state.json"
+# EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-aL6-v2"
+EMBEDDING_MODEL = "nomic-embed-text"
+CHUNK_METHOD = "naive"  # same as general
+CHUNK_TOKEN_NUMBER = 512
+PARSER_CONFIG = {
+    "chunk_token_num": CHUNK_TOKEN_NUMBER,
+    "delimiter": "\\n!?;。;!?",
+    "html4excel": False,
+    "layout_recognize": True,
+    "raptor": {"user_raptor": False},
+}
 
 
 def get_files_with_extensions(directory, file_extensions):
     matching_files = []
     for root, _, files in os.walk(directory):
         for file in files:
-            if any(file.endswith(ext) for ext in file_extensions):
+            if any(file.endswith(ext) for ext in FILE_EXTENSIONS):
                 absolute_path = os.path.abspath(os.path.join(root, file))
                 matching_files.append(absolute_path)
     return matching_files
 
 
-def chunk_list(data, chunk_size):
-    """Yield successive n-sized chunks from data."""
-    for i in range(0, len(data), chunk_size):
-        yield data[i : i + chunk_size]
+def calculate_sha1(file_path):
+    """Calculate the SHA1 hash of a file."""
+    hasher = hashlib.sha1()
+    try:
+        with open(file_path, "rb") as file:
+            while chunk := file.read(4096):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+    except FileNotFoundError:
+        cprint(f"Error: File not found at {file_path}", "red")
+        return None  # Or raise the exception, depending on desired behavior
+    except Exception as e:
+        cprint(f"Error calculating SHA1 for {file_path}: {e}", "red")
+        return None
+
+
+def load_file_state(file_path=FILE_STATE_PATH):
+    """Load the file state from a JSON file."""
+    try:
+        if os.path.exists(file_path):
+            with open(file_path, "r") as f:
+                return json.load(f)
+    except json.JSONDecodeError:
+        cprint(
+            f"Error: Could not decode JSON from {file_path}.  Returning empty dict.",
+            "red",
+        )
+        return {}
+    except Exception as e:
+        cprint(f"Error loading file state from {file_path}: {e}", "red")
+        return {}
+    return {}
+
+
+def save_file_state(file_state, file_path=FILE_STATE_PATH):
+    """Save the file state to a JSON file."""
+    try:
+        with open(file_path, "w") as f:
+            json.dump(file_state, f, indent=4)
+    except Exception as e:
+        cprint(f"Error saving file state to {file_path}: {e}", "red")
 
 
 def main():
-    if not _rf_api_key:
-        cprint(f"API Key Missing", "red")
-        return  # Exit if API key is missing
-
-    client = RAGFlow(api_key=_rf_api_key, base_url="http://localhost")
-    _fileList = get_files_with_extensions(_importDir, _fileExtensions)
-
+    IDS = []
+    # -------------------------------------------------------------------------------
+    # Create Datast
+    # -------------------------------------------------------------------------------
+    client = RAGFlow(api_key=f"{API_KEY}", base_url="http://localhost")
     try:
-        client.delete_datasets(ids=[f"{_dataset}"])
-        cprint(f"Deleted dataset '{_dataset}'", "yellow")
+        dataset = client.create_dataset(
+            name=f"{DATASET}",
+            embedding_model=EMBEDDING_MODEL,
+            chunk_method=CHUNK_METHOD,
+            parser_config=DataSet.ParserConfig(**PARSER_CONFIG),
+        )
     except Exception as e:
-        cprint(f"Exception during dataset deletion: {e}", "red")
-
-    try:
-        dataset = client.create_dataset(name=f"{_dataset}")
-        cprint(f"Created dataset: '{_dataset}'", "green")
-    except Exception as e:
-        cprint(f"Dataset might already exist, or another error occurred: {e}", "yellow")
-        datasets = client.list_datasets(name=_dataset)
+        print(f"Error creating dataset: {e}")
+        datasets = client.list_datasets(name=f"{DATASET}")
         if datasets:
             dataset = datasets[0]
-            cprint(f"Using existing dataset '{_dataset}'", "green")
         else:
-            cprint(colored("Failed to retrieve or create dataset.", "red"))
+            print("No datasets found, exiting.")
             return
 
-    # UPLOAD
-    upLoad = False
+    files = get_files_with_extensions(IMPORT_DIR, FILE_EXTENSIONS)
+    file_state = load_file_state()  # Load file state _before_ the loop
 
-    if upLoad:
-        for file in _fileList:
+    for file in files:
+        file_name = os.path.basename(file)
+        file_hash = calculate_sha1(file)
 
-        with open(file, "rb") as f:
-            file_content = f.read()
+        if file_hash is None:
+            cprint(f"Skipping {file_name} due to hashing error.", "red")
+            continue
 
-        filename = os.path.basename(file)
+        if file in file_state and file_state[file] == file_hash:
+            cprint(f"Skipping duplicate file: {file_name}", "yellow")
+            continue
 
-        document_list = [{"display_name": filename, "blob": file_content}]
+        try:
+            with open(file, "rb") as f:
+                file_content = f.read()
+        except Exception as e:
+            cprint(f"Error reading file {file_name}: {e}", "red")
+            continue  # Skip to the next file
 
-        dataset.upload_documents(document_list)
+        try:
+            cprint(f"Uploading file: {file_name}", "green")
+            dataset.upload_documents(
+                [
+                    {
+                        "display_name": f"{file_name}",
+                        "blob": file_content.decode(
+                            "utf-8", "ignore"
+                        ),  # Decode bytes to string
+                    },
+                ]
+            )
+            file_state[file] = file_hash  # Update state _after_ successful upload
+            save_file_state(file_state)
 
-        sleep(1)
-        cprint(f"Uploaded {filename}", "green")
+        except Exception as e:
+            cprint(f"Error uploading file {file_name}: {e}", "red")
+            continue  # Skip to the next file
 
-
-
-    # doclist = dataset.list_documents(orderby="create_time")
-
-    # for doc in doclist:
-    #    if doc.run == "UNSTART":
-    #        cprint(
-    #            f"Document DI: {doc.id}\nName: {doc.name}\nStatus: {doc.run}", "yellow"
-    #        )
-    #        print("\n")
+    print("Finished processing files.")
 
 
 if __name__ == "__main__":
