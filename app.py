@@ -177,6 +177,42 @@ def modify_parser(base_url, api_key, chunk_token_value, dataset_id):
             cprint(f"Response Text: {e.response.text}", "light_red")
 
 
+def upload_document(base_url, api_key, dataset_id, file_path):
+    """
+    Uploads a document to a specified dataset.
+
+    Args:
+        base_url (str): The base URL of the API.
+        api_key (str): The API key for authorization.
+        dataset_id (str): The ID of the dataset to which the document will be uploaded.
+        file_path (str): The path to the file to upload.
+
+    Returns:
+        dict: The JSON response from the API, or None if an error occurred.
+    """
+    url = f"http://{base_url}/api/v1/datasets/{dataset_id}/documents"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    data = {"file": (os.path.basename(file_path), open(file_path, "rb"))}
+
+    try:
+        files = {"file": (os.path.basename(file_path), open(file_path, "rb"))}
+        response = requests.post(url, headers=headers, files=files)
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+        if "response" in locals() and response is not None:
+            print(f"Response Status Code: {response.status_code}")
+            print(f"Response Content: {response.text}")
+        return None
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return None
+
+
 # -------------------------------------------------------------------------------
 # Get Files
 # -------------------------------------------------------------------------------
@@ -246,25 +282,40 @@ def save_file_state(file_state, file_path=FILE_STATE_PATH):
 
 
 def main():
+    DATASET_ID = get_dataset_id_by_name(BASE_URL, API_KEY, DATASET)
 
     response_data = create_dataset(
         BASE_URL, API_KEY, DATASET, EMBEDDING_MODEL, CHUNK_METHOD, CHUNK_TOKEN_NUMBER
     )
     if response_data:
         cprint("Dataset creation successful!", "green")
-        # print("Response:", json.dumps(response_data, indent=4))
     else:
         cprint("Dataset creation failed.", "red")
 
-    DATASET_ID = get_dataset_id_by_name(BASE_URL, API_KEY, DATASET)
-
     modify_parser(BASE_URL, API_KEY, CHUNK_TOKEN_NUMBER, DATASET_ID)
 
-    sys.exit()
     files = get_files_with_extensions(IMPORT_DIR, FILE_EXTENSIONS)
-    file_state = load_file_state()  # Load file state _before_ the loop
+    file_state = load_file_state()
 
-    print("Finished processing files.")
+    for file in files:
+        file_name = os.path.basename(file)
+        file_hash = calculate_sha1(file)
+
+        if file_hash is None:
+            continue  # Skip to the next file if hash calculation failed
+
+        if file_name in file_state and file_state[file_name] == file_hash:
+            cprint(f"File '{file_name}' already up-to-date. Skipping.", "yellow")
+            continue  # Skip upload if file is already up-to-date
+
+        response = upload_document(BASE_URL, API_KEY, DATASET_ID, file)
+
+        if response:
+            file_state[file_name] = file_hash  # Update file state
+            save_file_state(file_state)  # Save updated file state
+            cprint(f"Upload of '{file_name}' successful!", "green")
+        else:
+            cprint(f"Upload of '{file_name}' failed.", "red")
 
 
 if __name__ == "__main__":
