@@ -23,6 +23,7 @@ EMBEDDING_MODEL = "nomic-embed-text"
 CHUNK_METHOD = "naive"  # same as general
 CHUNK_TOKEN_NUMBER = 512
 PARSER_CONFIG = {
+    "chunk_token_num": CHUNK_TOKEN_NUMBER,
     "delimiter": "\\n!?;。;!?",
     "html4excel": False,
     "layout_recognize": True,
@@ -94,10 +95,7 @@ def main():
             name=f"{DATASET}",
             embedding_model=EMBEDDING_MODEL,
             chunk_method=CHUNK_METHOD,
-            parser_config=DataSet.ParserConfig(
-                chunk_token_num=CHUNK_TOKEN_NUMBER,
-                **PARSER_CONFIG**PARSER_CONFIG,
-            ),
+            parser_config=DataSet.ParserConfig(**PARSER_CONFIG),
         )
     except Exception as e:
         print(f"Error creating dataset: {e}")
