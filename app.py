@@ -15,7 +15,7 @@ from time import sleep
 DATASET = "logseq_dataset"
 API_KEY = retrieve_ragflow_api_key()
 IMPORT_DIR = os.path.expandvars("${HOME}/LLM_RAG/Logseq")
-BASE_URL = "http://localhost"
+BASE_URL = "http://localhost:8989"
 FILE_EXTENSIONS = [".md", ".txt", ".docx", ".pptx", ".xlsx"]
 FILE_STATE_PATH = "file_state.json"
 # EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-aL6-v2"
@@ -23,7 +23,6 @@ EMBEDDING_MODEL = "nomic-embed-text"
 CHUNK_METHOD = "naive"  # same as general
 CHUNK_TOKEN_NUMBER = 512
 PARSER_CONFIG = {
-    "chunk_token_num": CHUNK_TOKEN_NUMBER,
     "delimiter": "\\n!?;。;!?",
     "html4excel": False,
     "layout_recognize": True,
@@ -89,13 +88,16 @@ def main():
     # -------------------------------------------------------------------------------
     # Create Datast
     # -------------------------------------------------------------------------------
-    client = RAGFlow(api_key=f"{API_KEY}", base_url="http://localhost")
+    client = RAGFlow(api_key=f"{API_KEY}", base_url=BASE_URL)
     try:
         dataset = client.create_dataset(
             name=f"{DATASET}",
             embedding_model=EMBEDDING_MODEL,
             chunk_method=CHUNK_METHOD,
-            parser_config=DataSet.ParserConfig(**PARSER_CONFIG),
+            parser_config=DataSet.ParserConfig(
+                chunk_token_num=CHUNK_TOKEN_NUMBER,
+                **PARSER_CONFIG**PARSER_CONFIG,
+            ),
         )
     except Exception as e:
         print(f"Error creating dataset: {e}")
