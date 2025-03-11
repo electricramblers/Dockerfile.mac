@@ -329,6 +329,44 @@ def parse_document(base_url, api_key, dataset_id, document_id):
         return None
 
 
+def update_document_metadata(base_url, api_key, dataset_id, document_id, metadata):
+    """
+    Updates the metadata of a specific document.
+
+    Args:
+        base_url (str): The base URL of the API.
+        api_key (str): The API key for authorization.
+        dataset_id (str): The ID of the dataset.
+        document_id (str): The ID of the document to update.
+        metadata (dict): The metadata to add to the document.
+    """
+    url = f"http://{base_url}/api/v1/datasets/{dataset_id}/documents/{document_id}"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    data = {"metadata": metadata}
+
+    try:
+        response = requests.put(url, headers=headers, data=json.dumps(data))
+        response.raise_for_status()
+        result = response.json()
+
+        if result.get("code") == 0:
+            cprint(f"Document {document_id} metadata updated successfully!", "green")
+        else:
+            cprint(
+                f"Error updating document {document_id} metadata: {result.get('message')}",
+                "red",
+            )
+
+    except requests.exceptions.RequestException as e:
+        cprint(f"An error occurred during the API request: {e}", "red")
+        if hasattr(e, "response") and e.response:
+            cprint(f"Response Status Code: {e.response.status_code}", "light_red")
+            cprint(f"Response Text: {e.response.text}", "light_red")
+
+
 # -------------------------------------------------------------------------------
 # Get Files
 # -------------------------------------------------------------------------------
@@ -437,6 +475,9 @@ def main():
             document_id = response.get("data", [{}])[0].get("id")  # Extract document ID from response
             if document_id:
                 file_state.add_file(file, document_id)  # Add file to state with document ID
+                sha1_hash = file_state.get_file_sha1(file)  # Get SHA1 hash of the file
+                metadata = {"hash_value": {"sha1sum": sha1_hash}}
+                update_document_metadata(BASE_URL, API_KEY, DATASET_ID, document_id, metadata)
             else:
                 cprint(f"Could not extract document ID for '{file_name}'.", "red")
         else:
