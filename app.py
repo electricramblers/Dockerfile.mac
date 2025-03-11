@@ -410,6 +410,7 @@ def main():
             sleep(5)  # Wait 5 seconds after creating the dataset
         else:
             cprint("Dataset creation failed.", "red")
+            return  # Exit if dataset creation failed
     else:
         cprint(f"Dataset '{DATASET}' found with ID: {DATASET_ID}", "green")
 
@@ -419,6 +420,8 @@ def main():
 
     if DEBUG:
         files = files[:5]  # Limit to the first 5 files if DEBUG is True
+
+    uploaded_files = False  # Flag to track if any files were uploaded
 
     for file in files:
         file_name = os.path.basename(file)
@@ -438,6 +441,12 @@ def main():
                 cprint(f"Could not extract document ID for '{file_name}'.", "red")
         else:
             cprint(f"Upload of '{file_name}' failed.", "red")
+
+        uploaded_files = True  # Set flag to True if at least one file was uploaded
+
+    if not uploaded_files:
+        cprint("No new files were uploaded.", "cyan")
+        return  # Exit if no files were uploaded
 
     document_id_list = get_all_document_ids(BASE_URL, API_KEY, DATASET_ID)
 
