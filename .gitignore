@@ -4,5 +4,4 @@ __pycache__/
 file_state.json
 *.log
 notes.txt
-.env
-.env
+.aider_env
