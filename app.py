@@ -346,7 +346,7 @@ def update_document_metadata(base_url, api_key, dataset_id, document_id, metadat
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
-    data = {"metadata": metadata}
+    data = {"meta_fields": metadata}  # Changed 'metadata' to 'meta_fields'
 
     try:
         cprint(f"Updating document {document_id} metadata for {file_path} with: {metadata}", "blue")  # Add log
