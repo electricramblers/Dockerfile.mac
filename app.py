@@ -9,6 +9,7 @@ import sys
 from ansible.parsing.vault import get_file_vault_secret
 from termcolor import cprint, colored
 from src.RetrieveRfApi import retrieve_ragflow_api_key
+from src.FileManagement import FileState
 
 from time import sleep
 
@@ -389,6 +390,8 @@ def extract_file_info(data):
 
 
 def main():
+    global file_state  # Declare file_state as global
+    file_state = FileState()  # Initialize FileState here
     DATASET_ID = get_dataset_id_by_name(BASE_URL, API_KEY, DATASET)
 
     if not DATASET_ID:
@@ -419,10 +422,20 @@ def main():
 
     for file in files:
         file_name = os.path.basename(file)
+
+        if not file_state.should_upload(file):
+            cprint(f"Skipping '{file_name}' as it already exists and is unchanged.", "yellow")
+            continue
+
         response = upload_document(BASE_URL, API_KEY, DATASET_ID, file)
 
         if response:
             cprint(f"Upload of '{file_name}' successful!", "green")
+            document_id = response.get("data", [{}])[0].get("id")  # Extract document ID from response
+            if document_id:
+                file_state.add_file(file, document_id)  # Add file to state with document ID
+            else:
+                cprint(f"Could not extract document ID for '{file_name}'.", "red")
         else:
             cprint(f"Upload of '{file_name}' failed.", "red")
 
