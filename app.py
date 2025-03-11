@@ -35,8 +35,6 @@ CHUNK_METHOD = "naive"  # same as general
 CHUNK_TOKEN_NUMBER = 512
 NEW_PARSER_CONFIG = {"chunk_token_num": 512, "delimiter": "\\n!?;。;!?"}
 
-DEBUG = True  # Set to True to process only the first 5 documents, False to process all
-
 # -------------------------------------------------------------------------------
 # HTTP API STUFF
 # -------------------------------------------------------------------------------
@@ -147,7 +145,7 @@ def update_dataset(base_url, api_key, dataset_name, new_name=None):
         print(f"An error occurred: {e}")
         if "response" in locals() and response is not None:
             print(f"Response Status Code: {response.status_code}")
-            print(f"Response Content: {e.response.text}")
+            print(f"Response Content: {response.text}")
         return None
 
 
@@ -377,9 +375,6 @@ def main():
 
     files = get_files_with_extensions(IMPORT_DIR, FILE_EXTENSIONS)
     file_state = load_file_state()
-
-    if DEBUG:
-        files = files[:5]  # Limit to the first 5 files if DEBUG is True
 
     for file in files:
         file_name = os.path.basename(file)
