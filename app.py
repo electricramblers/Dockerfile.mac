@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import os
 import fnmatch
-import hashlib
 import json
 from pkgutil import get_data
 import random
@@ -310,54 +309,6 @@ def get_files_with_extensions(directory, file_extensions):
 
 
 # -------------------------------------------------------------------------------
-# File State
-# -------------------------------------------------------------------------------
-
-
-def calculate_sha1(file_path):
-    """Calculate the SHA1 hash of a file."""
-    hasher = hashlib.sha1()
-    try:
-        with open(file_path, "rb") as file:
-            while chunk := file.read(4096):
-                hasher.update(chunk)
-        return hasher.hexdigest()
-    except FileNotFoundError:
-        cprint(f"Error: File not found at {file_path}", "red")
-        return None  # Or raise the exception, depending on desired behavior
-    except Exception as e:
-        cprint(f"Error calculating SHA1 for {file_path}: {e}", "red")
-        return None
-
-
-def load_file_state(file_path=FILE_STATE_PATH):
-    """Load the file state from a JSON file."""
-    try:
-        if os.path.exists(file_path):
-            with open(file_path, "r") as f:
-                return json.load(f)
-    except json.JSONDecodeError:
-        cprint(
-            f"Error: Could not decode JSON from {file_path}.  Returning empty dict.",
-            "red",
-        )
-        return {}
-    except Exception as e:
-        cprint(f"Error loading file state from {file_path}: {e}", "red")
-        return {}
-    return {}
-
-
-def save_file_state(file_state, file_path=FILE_STATE_PATH):
-    """Save the file state to a JSON file."""
-    try:
-        with open(file_path, "w") as f:
-            json.dump(file_state, f, indent=4)
-    except Exception as e:
-        cprint(f"Error saving file state to {file_path}: {e}", "red")
-
-
-# -------------------------------------------------------------------------------
 # Information Extraction
 # -------------------------------------------------------------------------------
 
@@ -416,27 +367,15 @@ def main():
     modify_parser(BASE_URL, API_KEY, CHUNK_TOKEN_NUMBER, DATASET_ID)
 
     files = get_files_with_extensions(IMPORT_DIR, FILE_EXTENSIONS)
-    file_state = load_file_state()
 
     if DEBUG:
         files = files[:5]  # Limit to the first 5 files if DEBUG is True
 
     for file in files:
         file_name = os.path.basename(file)
-        file_hash = calculate_sha1(file)
-
-        if file_hash is None:
-            continue  # Skip to the next file if hash calculation failed
-
-        if file_name in file_state and file_state[file_name] == file_hash:
-            cprint(f"File '{file_name}' already up-to-date. Skipping.", "yellow")
-            continue  # Skip upload if file is already up-to-date
-
         response = upload_document(BASE_URL, API_KEY, DATASET_ID, file)
 
         if response:
-            file_state[file_name] = file_hash  # Update file state
-            save_file_state(file_state)  # Save updated file state
             cprint(f"Upload of '{file_name}' successful!", "green")
         else:
             cprint(f"Upload of '{file_name}' failed.", "red")
