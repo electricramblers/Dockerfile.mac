@@ -86,10 +86,14 @@ def get_all_documents(base_url, api_key, dataset_id, page_size=30):
                 page_number += 1  # Go to the next page
             else:
                 cprint("Error: Unexpected response format", "red")
+                cprint(f"Response data: {data}", "red")  # Log the response data
                 return None
 
         except requests.exceptions.RequestException as e:
             cprint(f"Request failed: {e}", "red")
+            if hasattr(e, "response") and e.response:
+                cprint(f"Response Status Code: {e.response.status_code}", "light_red")
+                cprint(f"Response Content: {e.response.text}", "light_red")
             return None
 
     return all_documents
@@ -115,6 +119,7 @@ def print_document_info(document):
             cprint(f"  {key}: {colored(value, 'green')}", "cyan")
     else:
         cprint("No metadata found for this document.", "cyan")
+        cprint(f"Document: {document}", "red")  # Log the document to inspect its structure
 
 
 def main():
