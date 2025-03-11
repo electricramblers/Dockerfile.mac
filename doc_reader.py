@@ -105,8 +105,8 @@ def print_document_info(document):
     cprint("--------------------------------------------------", "cyan")
     cprint(f"Document ID: {colored(document['id'], 'yellow')}", "cyan")
     cprint(f"File Name: {colored(document['name'], 'yellow')}", "cyan")
-    cprint(f"Created At: {colored(document['created_at'], 'yellow')}", "cyan")
-    cprint(f"Updated At: {colored(document['updated_at'], 'yellow')}", "cyan")
+    cprint(f"Created At: {colored(document.get('created_at', 'N/A'), 'yellow')}", "cyan")
+    cprint(f"Updated At: {colored(document.get('updated_at', 'N/A'), 'yellow')}", "cyan")
 
     metadata = document.get("metadata", {})
     if metadata:
