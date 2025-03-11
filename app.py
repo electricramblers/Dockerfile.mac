@@ -356,6 +356,46 @@ def save_file_state(file_state, file_path=FILE_STATE_PATH):
 
 
 # -------------------------------------------------------------------------------
+# Information Extraction
+# -------------------------------------------------------------------------------
+
+
+def extract_file_info(data):
+    """
+    Extracts and prints the filename and document ID from the given data.
+
+    Args:
+        data (dict): A dictionary containing file information.
+    """
+    if not isinstance(data, dict):
+        print("Error: Input data must be a dictionary.")
+        return
+
+    if "data" not in data:
+        print("Error: 'data' key not found in the dictionary.")
+        return
+
+    file_list = data["data"]
+
+    if not isinstance(file_list, list):
+        print("Error: 'data' field must be a list.")
+        return
+
+    for file_info in file_list:
+        if not isinstance(file_info, dict):
+            print("Error: Each item in 'data' list must be a dictionary.")
+            continue  # Use continue, not return, to process the remaining items in the list if one fails
+
+        if "name" not in file_info or "id" not in file_info:
+            print("Error: 'name' or 'id' key not found in a file_info dictionary.")
+            continue  # Use continue to proceed if any one is missing
+
+        file_name = file_info["name"]
+        document_id = file_info["id"]
+        print(f"File Name: {file_name}, Document ID: {document_id}")
+
+
+# -------------------------------------------------------------------------------
 # HERE BE DRAGONS
 # -------------------------------------------------------------------------------
 
@@ -388,7 +428,7 @@ def main():
             continue  # Skip upload if file is already up-to-date
 
         response = upload_document(BASE_URL, API_KEY, DATASET_ID, file)
-
+        print(extract_file_info(response))
         sys.exit()
         if response:
             file_state[file_name] = file_hash  # Update file state
