@@ -329,7 +329,7 @@ def parse_document(base_url, api_key, dataset_id, document_id):
         return None
 
 
-def update_document_metadata(base_url, api_key, dataset_id, document_id, metadata):
+def update_document_metadata(base_url, api_key, dataset_id, document_id, metadata, file_path):
     """
     Updates the metadata of a specific document.
 
@@ -339,6 +339,7 @@ def update_document_metadata(base_url, api_key, dataset_id, document_id, metadat
         dataset_id (str): The ID of the dataset.
         document_id (str): The ID of the document to update.
         metadata (dict): The metadata to add to the document.
+        file_path (str): The path to the file being processed.
     """
     url = f"http://{base_url}/api/v1/datasets/{dataset_id}/documents/{document_id}"
     headers = {
@@ -348,21 +349,24 @@ def update_document_metadata(base_url, api_key, dataset_id, document_id, metadat
     data = {"metadata": metadata}
 
     try:
-        cprint(f"Updating document {document_id} metadata with: {metadata}", "blue")  # Add log
+        cprint(f"Updating document {document_id} metadata for {file_path} with: {metadata}", "blue")  # Add log
         response = requests.put(url, headers=headers, data=json.dumps(data))
         response.raise_for_status()
         result = response.json()
 
         if result.get("code") == 0:
-            cprint(f"Document {document_id} metadata updated successfully!", "green")
+            cprint(f"Document {document_id} metadata updated successfully for {file_path}!", "green")
         else:
             cprint(
-                f"Error updating document {document_id} metadata: {result.get('message')}",
+                f"Error updating document {document_id} metadata for {file_path}: {result.get('message')}",
                 "red",
             )
+            cprint(f"Response code: {result.get('code')}", "red")
+            cprint(f"Response message: {result.get('message')}", "red")
+
 
     except requests.exceptions.RequestException as e:
-        cprint(f"An error occurred during the API request: {e}", "red")
+        cprint(f"An error occurred during the API request for {file_path}: {e}", "red")
         if hasattr(e, "response") and e.response:
             cprint(f"Response Status Code: {e.response.status_code}", "light_red")
             cprint(f"Response Text: {e.response.text}", "light_red")
@@ -478,7 +482,7 @@ def main():
                 file_state.add_file(file, document_id)  # Add file to state with document ID
                 sha1_hash = file_state.get_file_sha1(file)  # Get SHA1 hash of the file
                 metadata = {"hash_value": {"sha1sum": sha1_hash}}
-                update_document_metadata(BASE_URL, API_KEY, DATASET_ID, document_id, metadata)
+                update_document_metadata(BASE_URL, API_KEY, DATASET_ID, document_id, metadata, file)
             else:
                 cprint(f"Could not extract document ID for '{file_name}'.", "red")
         else:
