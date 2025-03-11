@@ -433,8 +433,7 @@ def main():
             continue  # Skip upload if file is already up-to-date
 
         response = upload_document(BASE_URL, API_KEY, DATASET_ID, file)
-        print(extract_file_info(response))
-        sys.exit()
+
         if response:
             file_state[file_name] = file_hash  # Update file state
             save_file_state(file_state)  # Save updated file state
