@@ -214,21 +214,23 @@ def upload_document(base_url, api_key, dataset_id, file_path):
         return None
 
 
-def get_all_document_ids(base_url, api_key, dataset_id, page_size=30):
+def get_all_document_ids(base_url, api_key, dataset_id, page_size=30, max_retries=3):
     """
-    Retrieves all document IDs from a dataset, handling pagination.
+    Retrieves all document IDs from a dataset, handling pagination and retries.
 
     Args:
-        address (str): The base API address.
+        base_url (str): The base API address.
         dataset_id (str): The ID of the dataset.
         api_key (str): The API key for authorization.
         page_size (int): The number of documents per page. Defaults to 30.
+        max_retries (int): The maximum number of retries. Defaults to 3.
 
     Returns:
         list: A list of all document IDs in the dataset.
     """
     all_document_ids = []
     page_number = 1
+    retries = 0
 
     while True:
         url = f"http://{base_url}/api/v1/datasets/{dataset_id}/documents?page={page_number}&page_size={page_size}"
@@ -237,27 +239,47 @@ def get_all_document_ids(base_url, api_key, dataset_id, page_size=30):
             "Content-Type": "application/json",
         }
 
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()  # Raise an exception for HTTP errors
+        try:
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()  # Raise an exception for HTTP errors
 
-        data = response.json()
+            data = response.json()
 
-        if "data" in data and "docs" in data["data"]:
-            documents = data["data"]["docs"]
+            if "data" in data and "docs" in data["data"]:
+                documents = data["data"]["docs"]
 
-            if not documents:
-                break  # No more documents, exit loop
+                if not documents:
+                    break  # No more documents, exit loop
 
-            for doc in documents:
-                all_document_ids.append(doc["id"])
+                for doc in documents:
+                    all_document_ids.append(doc["id"])
 
-            if len(documents) < page_size:
-                break  # Less than a full page, likely the last page
+                if len(documents) < page_size:
+                    break  # Less than a full page, likely the last page
 
-            page_number += 1  # Go to the next page
-        else:
-            print("Error: Unexpected response format")
-            break
+                page_number += 1  # Go to the next page
+            else:
+                print("Error: Unexpected response format")
+                if retries < max_retries:
+                    retries += 1
+                    print(f"Retrying in 2 seconds... (Attempt {retries}/{max_retries})")
+                    sleep(2)
+                    continue  # Retry the request
+                else:
+                    print("Max retries reached.  Returning empty list.")
+                    return []  # Return an empty list to avoid further errors
+
+        except requests.exceptions.RequestException as e:
+            print(f"Request failed: {e}")
+            if retries < max_retries:
+                retries += 1
+                print(f"Retrying in 2 seconds... (Attempt {retries}/{max_retries})")
+                sleep(2)
+                continue  # Retry the request
+            else:
+                print("Max retries reached.  Returning empty list.")
+                return []  # Return an empty list to avoid further errors
+        break
 
     return all_document_ids
 
