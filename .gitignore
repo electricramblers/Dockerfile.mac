@@ -5,3 +5,4 @@ file_state.json
 *.log
 notes.txt
 .aider_env
+.DS_Store
