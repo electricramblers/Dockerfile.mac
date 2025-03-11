@@ -35,6 +35,8 @@ CHUNK_METHOD = "naive"  # same as general
 CHUNK_TOKEN_NUMBER = 512
 NEW_PARSER_CONFIG = {"chunk_token_num": 512, "delimiter": "\\n!?;。;!?"}
 
+DEBUG = True  # Add this line
+
 # -------------------------------------------------------------------------------
 # HTTP API STUFF
 # -------------------------------------------------------------------------------
@@ -415,6 +417,9 @@ def main():
 
     files = get_files_with_extensions(IMPORT_DIR, FILE_EXTENSIONS)
     file_state = load_file_state()
+
+    if DEBUG:
+        files = files[:5]  # Limit to the first 5 files if DEBUG is True
 
     for file in files:
         file_name = os.path.basename(file)
