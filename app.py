@@ -192,13 +192,25 @@ def upload_document(base_url, api_key, dataset_id, file_path):
     """
     url = f"http://{base_url}/api/v1/datasets/{dataset_id}/documents"
     headers = {"Authorization": f"Bearer {api_key}"}
-    data = {"file": (os.path.basename(file_path), open(file_path, "rb"))}
+    # data = {"file": (os.path.basename(file_path), open(file_path, "rb"))}
 
     try:
         files = {"file": (os.path.basename(file_path), open(file_path, "rb"))}
         response = requests.post(url, headers=headers, files=files)
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-        return response.json()
+        response_json = response.json()
+        document_id = response_json.get("id")
+
+        if document_id:
+            file_state = load_file_state()
+            file_hash = calculate_sha1(file_path)
+            file_name = os.path.basename(file_path)
+            file_state[file_name] = {"hash": file_hash, "document_id": document_id}
+            save_file_state(file_state)
+            cprint(f"File state saved for '{file_name}' with document_id '{document_id}'", "blue")
+        else:
+            cprint(f"No document ID received for '{file_path}'.", "red")
+        return response_json
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
         if "response" in locals() and response is not None:
