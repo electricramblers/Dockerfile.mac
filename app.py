@@ -348,6 +348,7 @@ def update_document_metadata(base_url, api_key, dataset_id, document_id, metadat
     data = {"metadata": metadata}
 
     try:
+        cprint(f"Updating document {document_id} metadata with: {metadata}", "blue")  # Add log
         response = requests.put(url, headers=headers, data=json.dumps(data))
         response.raise_for_status()
         result = response.json()
