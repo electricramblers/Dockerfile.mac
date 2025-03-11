@@ -35,8 +35,6 @@ CHUNK_METHOD = "naive"  # same as general
 CHUNK_TOKEN_NUMBER = 512
 NEW_PARSER_CONFIG = {"chunk_token_num": 512, "delimiter": "\\n!?;。;!?"}
 
-DEBUG = True  # Set to True to process only the first 5 documents
-
 # -------------------------------------------------------------------------------
 # HTTP API STUFF
 # -------------------------------------------------------------------------------
@@ -378,8 +376,6 @@ def main():
     files = get_files_with_extensions(IMPORT_DIR, FILE_EXTENSIONS)
     file_state = load_file_state()
 
-    processed_count = 0  # Initialize a counter for processed files
-
     for file in files:
         file_name = os.path.basename(file)
         file_hash = calculate_sha1(file)
@@ -399,12 +395,6 @@ def main():
             cprint(f"Upload of '{file_name}' successful!", "green")
         else:
             cprint(f"Upload of '{file_name}' failed.", "red")
-
-        processed_count += 1  # Increment the counter after processing a file
-
-        if DEBUG and processed_count >= 5:
-            cprint("Debug mode: stopping after processing 5 documents.", "cyan")
-            break  # Exit the loop if in debug mode and 5 files have been processed
 
     document_id_list = get_all_document_ids(BASE_URL, API_KEY, DATASET_ID)
 
