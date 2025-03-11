@@ -100,7 +100,7 @@ def get_dataset_id_by_name(base_url, api_key, dataset_name):
             # You might want a more robust way to handle multiple matches.
             return data["data"][0]["id"]
         else:
-            print(f"Dataset with name '{dataset_name}' not found.")
+            # print(f"Dataset with name '{dataset_name}' not found.") #Commented out because it is expected on first run
             return None
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
@@ -151,6 +151,19 @@ def update_dataset(base_url, api_key, dataset_name, new_name=None):
 
 
 def modify_parser(base_url, api_key, chunk_token_value, dataset_id):
+    """
+    Modifies the parser configuration for a dataset.
+
+    Args:
+        base_url (str): The base URL of the API.
+        api_key (str): The API key for authorization.
+        chunk_token_value (int): The new chunk token value.
+        dataset_id (str): The ID of the dataset to modify.
+    """
+    if not dataset_id:
+        cprint("Skipping parser modification because dataset ID is invalid.", "yellow")
+        return
+
     url = f"http://{base_url}/api/v1/datasets/{dataset_id}"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
     data = {
@@ -262,8 +275,8 @@ def get_all_document_ids(base_url, api_key, dataset_id, page_size=30, max_retrie
                 print("Error: Unexpected response format")
                 if retries < max_retries:
                     retries += 1
-                    print(f"Retrying in 2 seconds... (Attempt {retries}/{max_retries})")
-                    sleep(2)
+                    print(f"Retrying in 5 seconds... (Attempt {retries}/{max_retries})")
+                    sleep(5)
                     continue  # Retry the request
                 else:
                     print("Max retries reached.  Returning empty list.")
@@ -273,8 +286,8 @@ def get_all_document_ids(base_url, api_key, dataset_id, page_size=30, max_retrie
             print(f"Request failed: {e}")
             if retries < max_retries:
                 retries += 1
-                print(f"Retrying in 2 seconds... (Attempt {retries}/{max_retries})")
-                sleep(2)
+                print(f"Retrying in 5 seconds... (Attempt {retries}/{max_retries})")
+                sleep(5)
                 continue  # Retry the request
             else:
                 print("Max retries reached.  Returning empty list.")
@@ -378,13 +391,24 @@ def extract_file_info(data):
 def main():
     DATASET_ID = get_dataset_id_by_name(BASE_URL, API_KEY, DATASET)
 
-    response_data = create_dataset(
-        BASE_URL, API_KEY, DATASET, EMBEDDING_MODEL, CHUNK_METHOD, CHUNK_TOKEN_NUMBER
-    )
-    if response_data:
-        cprint("Dataset creation successful!", "green")
+    if not DATASET_ID:
+        cprint(f"Dataset '{DATASET}' not found. Creating...", "yellow")
+        response_data = create_dataset(
+            BASE_URL,
+            API_KEY,
+            DATASET,
+            EMBEDDING_MODEL,
+            CHUNK_METHOD,
+            CHUNK_TOKEN_NUMBER,
+        )
+        if response_data:
+            cprint("Dataset creation successful!", "green")
+            DATASET_ID = get_dataset_id_by_name(BASE_URL, API_KEY, DATASET)  # Get the dataset ID after creating it
+            sleep(5)  # Wait 5 seconds after creating the dataset
+        else:
+            cprint("Dataset creation failed.", "red")
     else:
-        cprint("Dataset creation failed.", "red")
+        cprint(f"Dataset '{DATASET}' found with ID: {DATASET_ID}", "green")
 
     modify_parser(BASE_URL, API_KEY, CHUNK_TOKEN_NUMBER, DATASET_ID)
 
