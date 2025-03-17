@@ -278,6 +278,7 @@
         - compose
         - configure
         - rebuild
+      when: "'takedown' not in ansible_run_tags"
 
     - name: Stop and remove containers
       command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml down"
@@ -285,11 +286,13 @@
         chdir: "{{ base_dir }}"
       tags:
         - takedown
+      when: "'takedown' in ansible_run_tags"
 
     - name: Prune container system
       command: "{{ container_engine }} system prune -af"
       tags:
         - takedown
+      when: "'takedown' in ansible_run_tags"
 
     - name: Final message
       debug:
@@ -298,9 +301,11 @@
         - compose
         - configure
         - rebuild
+      when: "'takedown' not in ansible_run_tags"
 
     - name: Takedown complete message
       debug:
         msg: "RagFlow containers have been stopped and removed. System has been pruned."
       tags:
         - takedown
+      when: "'takedown' in ansible_run_tags"
