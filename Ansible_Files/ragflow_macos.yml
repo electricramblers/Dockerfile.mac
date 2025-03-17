@@ -219,6 +219,7 @@
       tags:
         - clone
         - configure
+        - rebuild
 
     - name: Copy Dockerfile.mac to the desired location
       copy:
@@ -227,6 +228,7 @@
         remote_src: yes
       tags:
         - clone
+        - rebuild
 
     - name: Copy docker-compose-mac.yml to the desired location
       copy:
@@ -236,7 +238,7 @@
       tags:
         - clone
         - configure
-
+        - rebuild
     - name: Copy the service_conf.yaml.template to the desired location.
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/service_conf.yaml.template"
@@ -247,6 +249,7 @@
       tags:
         - clone
         - configure
+        - rebuild
 
     - name: Clean up the cloned repository
       file:
@@ -255,6 +258,7 @@
       tags:
         - clone
         - configure
+        - rebuild
 
     - name: Build Ragflow image for MacOS
       command: "{{ container_engine }} build -f Dockerfile.mac -t infiniflow/ragflow:nightly {{ '--format docker' if container_engine == 'podman' else '' }} ."
