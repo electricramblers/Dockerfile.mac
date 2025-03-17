@@ -278,6 +278,28 @@
         - configure
         - rebuild
 
+    - name: Stop and remove containers
+      command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml down"
+      args:
+        chdir: "{{ base_dir }}"
+      tags:
+        - takedown
+
+    - name: Prune container system
+      command: "{{ container_engine }} system prune -af"
+      tags:
+        - takedown
+
     - name: Final message
       debug:
         msg: "RagFlow has been successfully installed and started on your MacOS system. Access the web UI at http://localhost"
+      tags:
+        - compose
+        - configure
+        - rebuild
+
+    - name: Takedown complete message
+      debug:
+        msg: "RagFlow containers have been stopped and removed. System has been pruned."
+      tags:
+        - takedown
