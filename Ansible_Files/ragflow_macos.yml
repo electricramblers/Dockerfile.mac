@@ -270,42 +270,44 @@
       tags:
         - rebuild
 
-    - name: Compose up - TOTAL
-      command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml up -d"
-      args:
-        chdir: "{{ base_dir }}"
-      tags:
-        - compose
-        - configure
-        - rebuild
-      when: "'takedown' not in ansible_run_tags"
-
+    # Takedown tasks - only run when takedown tag is specified
     - name: Stop and remove containers
       command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml down"
       args:
         chdir: "{{ base_dir }}"
+      when: "'takedown' in ansible_run_tags"
       tags:
         - takedown
-      when: "'takedown' in ansible_run_tags"
 
     - name: Prune container system
       command: "{{ container_engine }} system prune -af"
+      when: "'takedown' in ansible_run_tags"
       tags:
         - takedown
-      when: "'takedown' in ansible_run_tags"
-
-    - name: Final message
-      debug:
-        msg: "RagFlow has been successfully installed and started on your MacOS system. Access the web UI at http://localhost"
-      tags:
-        - compose
-        - configure
-        - rebuild
-      when: "'takedown' not in ansible_run_tags"
 
     - name: Takedown complete message
       debug:
         msg: "RagFlow containers have been stopped and removed. System has been pruned."
+      when: "'takedown' in ansible_run_tags"
       tags:
         - takedown
-      when: "'takedown' in ansible_run_tags"
+
+    # Compose up task - run when takedown tag is NOT specified
+    - name: Compose up - TOTAL
+      command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml up -d"
+      args:
+        chdir: "{{ base_dir }}"
+      when: "'takedown' not in ansible_run_tags"
+      tags:
+        - compose
+        - configure
+        - rebuild
+
+    - name: Final message
+      debug:
+        msg: "RagFlow has been successfully installed and started on your MacOS system. Access the web UI at http://localhost"
+      when: "'takedown' not in ansible_run_tags"
+      tags:
+        - compose
+        - configure
+        - rebuild
