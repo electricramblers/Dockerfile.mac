@@ -83,6 +83,7 @@
         - compose
         - configure
         - rebuild
+        - takedown
 
     - name: Backup pyproject.toml
       command: cp "{{ pyproject_toml_path }}" "{{ pyproject_toml_path }}.bak"
