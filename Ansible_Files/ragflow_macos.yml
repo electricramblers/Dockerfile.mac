@@ -281,7 +281,7 @@
         - rebuild
 
     - name: Apply crttai.patch
-      shell: patch -p1 < crttai.patch
+      shell: patch -p1 -t < crttai.patch
       args:
         chdir: "{{ base_dir }}/web/src"
       when: patch_file.stat.exists and not patched_file.stat.exists
