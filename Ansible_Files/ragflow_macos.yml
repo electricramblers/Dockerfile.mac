@@ -255,7 +255,7 @@
       shell: patch -p1 < "{{ base_dir }}/docker/crttai.patch"
       args:
         chdir: "{{ base_dir }}/web/src"
-      creates: "{{ base_dir }}/web/src/conf.json.patched"
+        creates: "{{ base_dir }}/web/src/conf.json.patched"
       tags:
         - clone
         - configure
