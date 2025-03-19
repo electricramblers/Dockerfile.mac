@@ -230,6 +230,48 @@
         - configure
         - rebuild
 
+    - name: Copy crttai.patch to the docker directory
+      copy:
+        src: "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
+        dest: "{{ base_dir }}/docker/crttai.patch"
+        remote_src: yes
+        decrypt: yes
+      when:
+        - lookup('env', 'ANSIBLE_VAULT_PASSWORD_FILE') != ''
+      tags:
+        - clone
+        - configure
+        - rebuild
+
+    - name: Apply crttai.patch
+      command: patch -d "{{ base_dir }}/docker" -p1 < crttai.patch
+      args:
+        chdir: "{{ base_dir }}/docker"
+      tags:
+        - clone
+        - configure
+        - rebuild
+
+    - name: Copy bannerlogo.svg to intergrations/extension_chrome/assets/logo.svg
+      copy:
+        src: "{{ base_dir }}/dockerfile_mac_repo/bannerlogo.svg"
+        dest: "{{ base_dir }}/intergrations/extension_chrome/assets/logo.svg"
+        remote_src: yes
+      tags:
+        - clone
+        - configure
+        - rebuild
+
+    - name: Copy bannerlogo.svg to web/public/logo.svg
+      copy:
+        src: "{{ base_dir }}/dockerfile_mac_repo/bannerlogo.svg"
+        dest: "{{ base_dir }}/web/public/logo.svg"
+        remote_src: yes
+      tags:
+        - clone
+        - configure
+        - rebuild
+
     - name: Copy Dockerfile.mac to the desired location
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/Dockerfile.mac"
