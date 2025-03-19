@@ -266,7 +266,7 @@ RUN echo "Preparing dependency lock file..." && \
         uv sync --python 3.10 --frozen; \
     else \
         echo "Installing full package set (this may take a while)..." && \
-        uv sync --python 3.10 --frozen --all-extras; \
+        UV_HTTP_TIMEOUT=120 uv sync --python 3.10 --frozen --all-extras; \
     fi && \
     echo "Python dependencies installed successfully"
 
