@@ -252,13 +252,21 @@
         - rebuild
 
     - name: Apply crttai.patch
-      command: patch -d "{{ base_dir }}/docker" -p1 < crttai.patch
+      shell: patch -d "{{ base_dir }}/docker" -p1 < crttai.patch
       args:
         chdir: "{{ base_dir }}/docker"
+      creates: "{{ base_dir }}/docker/patched"
       tags:
         - clone
         - configure
         - rebuild
+      register: patch_result
+
+    - name: Create patched file
+      file:
+        path: "{{ base_dir }}/docker/patched"
+        state: touch
+      when: patch_result.changed
 
     - name: Copy bannerlogo.svg to intergrations/extension_chrome/assets/logo.svg
       copy:
