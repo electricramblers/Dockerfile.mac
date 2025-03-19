@@ -323,7 +323,7 @@
 
     - name: Copy bannerlogo.svg to intergrations/extension_chrome/assets/logo.svg
       copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/bannerlogo.svg"
+        src: "{{ base_dir }}/dockerfile_mac_repo/Images/bannerlogo.svg"
         dest: "{{ base_dir }}/intergrations/extension_chrome/assets/logo.svg"
         remote_src: yes
       tags:
@@ -333,7 +333,7 @@
 
     - name: Copy bannerlogo.svg to web/public/logo.svg
       copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/bannerlogo.svg"
+        src: "{{ base_dir }}/dockerfile_mac_repo/Images/bannerlogo.svg"
         dest: "{{ base_dir }}/web/public/logo.svg"
         remote_src: yes
       tags:
