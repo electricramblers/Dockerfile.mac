@@ -251,22 +251,56 @@
         - configure
         - rebuild
 
-    - name: Apply crttai.patch
-      shell: patch -p1 < "{{ base_dir }}/docker/crttai.patch"
-      args:
-        chdir: "{{ base_dir }}/web/src"
-        creates: "{{ base_dir }}/web/src/conf.json.patched"
+    - name: Check if patch file exists
+      stat:
+        path: "{{ base_dir }}/docker/crttai.patch"
+      register: patch_file
       tags:
         - clone
         - configure
         - rebuild
+
+    - name: Check if already patched
+      stat:
+        path: "{{ base_dir }}/web/src/conf.json.patched"
+      register: patched_file
+      tags:
+        - clone
+        - configure
+        - rebuild
+
+    - name: Apply crttai.patch
+      shell: cat "{{ base_dir }}/docker/crttai.patch" | patch -p1
+      args:
+        chdir: "{{ base_dir }}/web/src"
+      when: patch_file.stat.exists and not patched_file.stat.exists
       register: patch_result
+      ignore_errors: yes
+      async: 60
+      poll: 5
+      tags:
+        - clone
+        - configure
+        - rebuild
+
+    - name: Debug patch result
+      debug:
+        var: patch_result
+      when: patch_result is defined
+      tags:
+        - clone
+        - configure
+        - rebuild
 
     - name: Create patched file
       file:
         path: "{{ base_dir }}/web/src/conf.json.patched"
         state: touch
-      when: patch_result.changed
+      when: patch_result is defined and patch_result.rc == 0
+      tags:
+        - clone
+        - configure
+        - rebuild
 
     - name: Copy bannerlogo.svg to intergrations/extension_chrome/assets/logo.svg
       copy:
