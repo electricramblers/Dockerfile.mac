@@ -269,15 +269,24 @@
         - configure
         - rebuild
 
+    - name: Copy patch file to web/src directory
+      copy:
+        src: "{{ base_dir }}/docker/crttai.patch"
+        dest: "{{ base_dir }}/web/src/crttai.patch"
+        remote_src: yes
+      when: patch_file.stat.exists and not patched_file.stat.exists
+      tags:
+        - clone
+        - configure
+        - rebuild
+
     - name: Apply crttai.patch
-      shell: cat "{{ base_dir }}/docker/crttai.patch" | patch -p1
+      shell: patch -p1 < crttai.patch
       args:
         chdir: "{{ base_dir }}/web/src"
       when: patch_file.stat.exists and not patched_file.stat.exists
       register: patch_result
       ignore_errors: yes
-      async: 60
-      poll: 5
       tags:
         - clone
         - configure
@@ -292,11 +301,21 @@
         - configure
         - rebuild
 
-    - name: Create patched file
+    - name: Create patched file marker
       file:
         path: "{{ base_dir }}/web/src/conf.json.patched"
         state: touch
       when: patch_result is defined and patch_result.rc == 0
+      tags:
+        - clone
+        - configure
+        - rebuild
+
+    - name: Remove temporary patch file from web/src
+      file:
+        path: "{{ base_dir }}/web/src/crttai.patch"
+        state: absent
+      when: patch_file.stat.exists and not patched_file.stat.exists
       tags:
         - clone
         - configure
