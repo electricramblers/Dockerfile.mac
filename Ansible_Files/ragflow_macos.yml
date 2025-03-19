@@ -202,11 +202,17 @@
         chdir: "{{ base_dir }}"
 
     - name: Build dependencies image
-      command: "{{ container_engine }} build -f Dockerfile.deps -t infiniflow/ragflow_deps {{ '--format docker' if container_engine == 'podman' else '' }} . > {{ log_file }} 2>&1"
+      command: "{{ container_engine }} build -f Dockerfile.deps -t infiniflow/ragflow_deps {{ '--format docker' if container_engine == 'podman' else '' }} ."
       args:
         chdir: "{{ base_dir }}"
       register: deps_build_result
       ignore_errors: true
+
+    - name: Save dependencies build output to log file
+      copy:
+        content: "{{ deps_build_result.stdout + '\n' + deps_build_result.stderr }}"
+        dest: "{{ log_file }}"
+      when: deps_build_result.rc != 0 or deps_build_result.stdout != "" or deps_build_result.stderr != ""
 
     #-------------------------------------------------------------------------------
     # Repo  Stuff
@@ -263,13 +269,19 @@
         - rebuild
 
     - name: Build Ragflow image for MacOS
-      command: "{{ container_engine }} build -f Dockerfile.mac -t infiniflow/ragflow:nightly {{ '--format docker' if container_engine == 'podman' else '' }} . > {{ log_file }} 2>&1"
+      command: "{{ container_engine }} build -f Dockerfile.mac -t infiniflow/ragflow:nightly {{ '--format docker' if container_engine == 'podman' else '' }} ."
       args:
         chdir: "{{ base_dir }}"
       register: mac_build_result
       ignore_errors: true
       tags:
         - rebuild
+
+    - name: Save build output to log file
+      copy:
+        content: "{{ mac_build_result.stdout + '\n' + mac_build_result.stderr }}"
+        dest: "{{ log_file }}"
+      when: mac_build_result.rc != 0 or mac_build_result.stdout != "" or mac_build_result.stderr != ""
 
     # Takedown tasks - only run when takedown tag is specified
     - name: Stop and remove containers
