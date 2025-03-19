@@ -252,10 +252,10 @@
         - rebuild
 
     - name: Apply crttai.patch
-      shell: patch -d "{{ base_dir }}/docker" -p1 < crttai.patch
+      shell: patch -p1 < "{{ base_dir }}/docker/crttai.patch"
       args:
-        chdir: "{{ base_dir }}/docker"
-      creates: "{{ base_dir }}/docker/patched"
+        chdir: "{{ base_dir }}/web/src"
+      creates: "{{ base_dir }}/web/src/conf.json.patched"
       tags:
         - clone
         - configure
@@ -264,7 +264,7 @@
 
     - name: Create patched file
       file:
-        path: "{{ base_dir }}/docker/patched"
+        path: "{{ base_dir }}/web/src/conf.json.patched"
         state: touch
       when: patch_result.changed
 
