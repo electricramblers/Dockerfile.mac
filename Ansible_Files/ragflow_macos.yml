@@ -20,6 +20,7 @@
     dockerfile_mac_dest: "{{ base_dir }}/Dockerfile.mac"
     docker_volume_path: "{{ ansible_env.HOME }}/volumes/rf"
     env_volume_line: "DOCKER_VOLUME_DIRECTORY={{ docker_volume_path }}"
+    log_file: "{{ base_dir }}/ansible_build.log"
 
   tasks:
     - name: Check if running on macOS
@@ -201,7 +202,7 @@
         chdir: "{{ base_dir }}"
 
     - name: Build dependencies image
-      command: "{{ container_engine }} build -f Dockerfile.deps -t infiniflow/ragflow_deps {{ '--format docker' if container_engine == 'podman' else '' }} ."
+      command: "{{ container_engine }} build -f Dockerfile.deps -t infiniflow/ragflow_deps {{ '--format docker' if container_engine == 'podman' else '' }} . > {{ log_file }} 2>&1"
       args:
         chdir: "{{ base_dir }}"
       register: deps_build_result
@@ -262,7 +263,7 @@
         - rebuild
 
     - name: Build Ragflow image for MacOS
-      command: "{{ container_engine }} build -f Dockerfile.mac -t infiniflow/ragflow:nightly {{ '--format docker' if container_engine == 'podman' else '' }} ."
+      command: "{{ container_engine }} build -f Dockerfile.mac -t infiniflow/ragflow:nightly {{ '--format docker' if container_engine == 'podman' else '' }} . > {{ log_file }} 2>&1"
       args:
         chdir: "{{ base_dir }}"
       register: mac_build_result
@@ -292,7 +293,7 @@
       tags:
         - takedown
 
-    # Compose up task - run when takedown tag is NOT specified
+    # Compose up task - only run when takedown tag is NOT specified
     - name: Compose up - TOTAL
       command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml up -d"
       args:
