@@ -21,6 +21,7 @@
     docker_volume_path: "{{ ansible_env.HOME }}/volumes/rf"
     env_volume_line: "DOCKER_VOLUME_DIRECTORY={{ docker_volume_path }}"
     log_file: "{{ base_dir }}/ansible_build.log"
+    repo_branch: "develop" # Default branch
 
   tasks:
     - name: Check if running on macOS
@@ -222,7 +223,7 @@
       git:
         repo: "{{ dockerfile_mac_url }}"
         dest: "{{ base_dir }}/dockerfile_mac_repo"
-        version: main # or the relevant branch
+        version: "{{ repo_branch }}"
         force: yes
       tags:
         - clone
