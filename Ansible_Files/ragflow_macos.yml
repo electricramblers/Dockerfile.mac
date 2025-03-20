@@ -279,7 +279,7 @@
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
         dest: "{{ base_dir }}/docker/crttai.patch"
-        remote_src: yes
+        remote_src: no
       when: repo_patch_file.stat.exists and not patched_file.stat.exists
       tags:
         - clone
@@ -290,7 +290,7 @@
       copy:
         src: "{{ conf_json_path }}"
         dest: "{{ conf_json_path }}.bak"
-        remote_src: yes
+        remote_src: no
       when:
         - conf_json_exists.stat.exists
         - not patched_file.stat.exists
@@ -368,7 +368,7 @@
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/Dockerfile.mac"
         dest: "{{ base_dir }}/Dockerfile.mac"
-        remote_src: yes
+        remote_src: no
       tags:
         - clone
         - rebuild
@@ -377,7 +377,7 @@
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/docker-compose-mac.yml"
         dest: "{{ base_dir }}/docker/docker-compose-mac.yml"
-        remote_src: yes
+        remote_src: no
       tags:
         - clone
         - configure
