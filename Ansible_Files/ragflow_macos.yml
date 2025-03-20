@@ -238,10 +238,19 @@
         - configure
         - rebuild
 
-    - name: Check if patch file exists
+    - name: Check if patch file exists in repository
       stat:
         path: "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
-      register: patch_file
+      register: repo_patch_file
+      tags:
+        - clone
+        - configure
+        - rebuild
+
+    - name: Check if local patch file exists
+      stat:
+        path: "{{ base_dir }}/docker/crttai.patch"
+      register: local_patch_file
       tags:
         - clone
         - configure
@@ -256,33 +265,37 @@
         - configure
         - rebuild
 
-    - name: Copy patch file to web/src directory
+    - name: Copy patch file from repository if it exists
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
-        dest: "{{ base_dir }}/web/src/crttai.patch"
+        dest: "{{ base_dir }}/docker/crttai.patch"
         remote_src: yes
-      when: patch_file.stat.exists and not patched_file.stat.exists
+      when: repo_patch_file.stat.exists and not patched_file.stat.exists
       tags:
         - clone
         - configure
         - rebuild
 
-    - name: Apply crttai.patch
-      shell: patch -p1 -t < crttai.patch
-      args:
-        chdir: "{{ base_dir }}/web/src"
-      when: patch_file.stat.exists and not patched_file.stat.exists
-      register: patch_result
-      ignore_errors: yes
+    - name: Create backup of conf.json before patching
+      copy:
+        src: "{{ base_dir }}/web/src/conf.json"
+        dest: "{{ base_dir }}/web/src/conf.json.bak"
+        remote_src: yes
+      when: (repo_patch_file.stat.exists or local_patch_file.stat.exists) and not patched_file.stat.exists
       tags:
         - clone
         - configure
         - rebuild
 
-    - name: Debug patch result
-      debug:
-        var: patch_result
-      when: patch_result is defined
+    - name: Directly modify conf.json instead of using patch
+      copy:
+        content: |
+          {
+            "appName": "Truist-AI"
+          }
+        dest: "{{ base_dir }}/web/src/conf.json"
+      when: not patched_file.stat.exists
+      register: conf_json_result
       tags:
         - clone
         - configure
@@ -292,17 +305,16 @@
       file:
         path: "{{ base_dir }}/web/src/conf.json.patched"
         state: touch
-      when: patch_result is defined and 'rc' in patch_result and patch_result.rc == 0
+      when: conf_json_result is changed
       tags:
         - clone
         - configure
         - rebuild
 
-    - name: Remove temporary patch file from web/src
-      file:
-        path: "{{ base_dir }}/web/src/crttai.patch"
-        state: absent
-      when: patch_file.stat.exists and not patched_file.stat.exists
+    - name: Debug conf.json modification result
+      debug:
+        msg: "Successfully updated conf.json to change appName to Truist-AI"
+      when: conf_json_result is changed
       tags:
         - clone
         - configure
