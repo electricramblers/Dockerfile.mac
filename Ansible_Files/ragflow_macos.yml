@@ -292,7 +292,7 @@
       file:
         path: "{{ base_dir }}/web/src/conf.json.patched"
         state: touch
-      when: patch_result is defined and patch_result.rc == 0
+      when: patch_result is defined and 'rc' in patch_result and patch_result.rc == 0
       tags:
         - clone
         - configure
