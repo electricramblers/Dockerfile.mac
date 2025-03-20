@@ -241,19 +241,9 @@
         - configure
         - rebuild
 
-    - name: Copy crttai.patch to the docker directory
-      copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
-        dest: "{{ base_dir }}/docker/crttai.patch"
-        remote_src: yes
-      tags:
-        - clone
-        - configure
-        - rebuild
-
     - name: Check if patch file exists
       stat:
-        path: "{{ base_dir }}/docker/crttai.patch"
+        path: "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
       register: patch_file
       tags:
         - clone
@@ -271,7 +261,7 @@
 
     - name: Copy patch file to web/src directory
       copy:
-        src: "{{ base_dir }}/docker/crttai.patch"
+        src: "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
         dest: "{{ base_dir }}/web/src/crttai.patch"
         remote_src: yes
       when: patch_file.stat.exists and not patched_file.stat.exists

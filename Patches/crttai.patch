@@ -1,7 +1,7 @@
-diff --git a/../web/src/conf.json b/../web/src/conf.json
+diff --git a/conf.json b/conf.json
 index a407b60c..4613efe6 100644
---- a/../web/src/conf.json
-+++ b/../web/src/conf.json
+--- a/conf.json
++++ b/conf.json
 @@ -1,3 +1,3 @@
  {
 -  "appName": "RAGFlow"
