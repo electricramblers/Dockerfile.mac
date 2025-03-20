@@ -230,17 +230,6 @@
         - configure
         - rebuild
 
-    - name: Decrypt crttai.patch
-      command: ansible-vault decrypt "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch" --output "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
-      args:
-        chdir: "{{ base_dir }}"
-      when:
-        - lookup('env', 'ANSIBLE_VAULT_PASSWORD_FILE') != ''
-      tags:
-        - clone
-        - configure
-        - rebuild
-
     - name: Check if patch file exists
       stat:
         path: "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
@@ -353,8 +342,7 @@
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/service_conf.yaml.template"
         dest: "{{ base_dir }}/docker/service_conf.yaml.template"
-      when:
-        - lookup('env', 'ANSIBLE_VAULT_PASSWORD_FILE') != ''
+        remote_src: yes
       tags:
         - clone
         - configure
