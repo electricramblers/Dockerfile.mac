@@ -29,14 +29,6 @@
         msg: "This playbook should only be run on macOS."
       when: ansible_os_family != "Darwin"
 
-    - name: Stop and remove ragflow-server container (if rebuild tag is used)
-      command: "{{ container_engine }} rm -f ragflow-server"
-      ignore_errors: true
-      changed_when: false
-      when: "'rebuild' in ansible_run_tags"
-      tags:
-        - rebuild
-
     - name: Set BASE_DIR if running from the 'ragflow' directory
       set_fact:
         base_dir: "{{ playbook_dir }}"
@@ -94,6 +86,14 @@
         - configure
         - rebuild
         - takedown
+
+    - name: Stop and remove ragflow-server container (if rebuild tag is used)
+      command: "{{ container_engine }} rm -f ragflow-server"
+      ignore_errors: true
+      changed_when: false
+      when: "'rebuild' in ansible_run_tags"
+      tags:
+        - rebuild
 
     - name: Backup pyproject.toml
       command: cp "{{ pyproject_toml_path }}" "{{ pyproject_toml_path }}.bak"
