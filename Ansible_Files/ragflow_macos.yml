@@ -291,7 +291,7 @@
         src: "{{ conf_json_path }}"
         dest: "{{ conf_json_path }}.bak"
         remote_src: yes
-      when: 
+      when:
         - conf_json_exists.stat.exists
         - not patched_file.stat.exists
       tags:
@@ -306,7 +306,7 @@
             "appName": "Truist-AI"
           }
         dest: "{{ conf_json_path }}"
-      when: 
+      when:
         - conf_json_exists.stat.exists
         - not patched_file.stat.exists
       register: conf_json_result
@@ -348,6 +348,7 @@
         src: "{{ base_dir }}/dockerfile_mac_repo/Images/bannerlogo.svg"
         dest: "{{ base_dir }}/intergrations/extension_chrome/assets/logo.svg"
         remote_src: yes
+        decrypt: True
       tags:
         - clone
         - configure
@@ -358,6 +359,7 @@
         src: "{{ base_dir }}/dockerfile_mac_repo/Images/bannerlogo.svg"
         dest: "{{ base_dir }}/web/public/logo.svg"
         remote_src: yes
+        decrypt: true
       tags:
         - clone
         - configure
