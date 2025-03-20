@@ -306,6 +306,7 @@
             "appName": "Truist-AI"
           }
         dest: "{{ conf_json_path }}"
+        decrypt: true
       when:
         - conf_json_exists.stat.exists
         - not patched_file.stat.exists
@@ -347,8 +348,7 @@
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/Images/bannerlogo.svg"
         dest: "{{ base_dir }}/intergrations/extension_chrome/assets/logo.svg"
-        remote_src: yes
-        decrypt: True
+        remote_src: no
       tags:
         - clone
         - configure
@@ -358,8 +358,7 @@
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/Images/bannerlogo.svg"
         dest: "{{ base_dir }}/web/public/logo.svg"
-        remote_src: yes
-        decrypt: true
+        remote_src: no
       tags:
         - clone
         - configure
@@ -383,11 +382,13 @@
         - clone
         - configure
         - rebuild
+
     - name: Copy the service_conf.yaml.template to the desired location.
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/service_conf.yaml.template"
         dest: "{{ base_dir }}/docker/service_conf.yaml.template"
-        remote_src: yes
+        remote_src: no
+        decrypt: yes
       tags:
         - clone
         - configure
