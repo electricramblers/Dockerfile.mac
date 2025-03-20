@@ -22,6 +22,7 @@
     env_volume_line: "DOCKER_VOLUME_DIRECTORY={{ docker_volume_path }}"
     log_file: "{{ base_dir }}/ansible_build.log"
     repo_branch: "develop" # Default branch
+    conf_json_path: "{{ base_dir }}/web/src/conf.json"
 
   tasks:
     - name: Check if running on macOS
@@ -256,9 +257,18 @@
         - configure
         - rebuild
 
+    - name: Check if conf.json exists
+      stat:
+        path: "{{ conf_json_path }}"
+      register: conf_json_exists
+      tags:
+        - clone
+        - configure
+        - rebuild
+
     - name: Check if already patched
       stat:
-        path: "{{ base_dir }}/web/src/conf.json.patched"
+        path: "{{ conf_json_path }}.patched"
       register: patched_file
       tags:
         - clone
@@ -278,10 +288,12 @@
 
     - name: Create backup of conf.json before patching
       copy:
-        src: "{{ base_dir }}/web/src/conf.json"
-        dest: "{{ base_dir }}/web/src/conf.json.bak"
+        src: "{{ conf_json_path }}"
+        dest: "{{ conf_json_path }}.bak"
         remote_src: yes
-      when: (repo_patch_file.stat.exists or local_patch_file.stat.exists) and not patched_file.stat.exists
+      when: 
+        - conf_json_exists.stat.exists
+        - not patched_file.stat.exists
       tags:
         - clone
         - configure
@@ -293,8 +305,10 @@
           {
             "appName": "Truist-AI"
           }
-        dest: "{{ base_dir }}/web/src/conf.json"
-      when: not patched_file.stat.exists
+        dest: "{{ conf_json_path }}"
+      when: 
+        - conf_json_exists.stat.exists
+        - not patched_file.stat.exists
       register: conf_json_result
       tags:
         - clone
@@ -303,7 +317,7 @@
 
     - name: Create patched file marker
       file:
-        path: "{{ base_dir }}/web/src/conf.json.patched"
+        path: "{{ conf_json_path }}.patched"
         state: touch
       when: conf_json_result is changed
       tags:
@@ -315,6 +329,15 @@
       debug:
         msg: "Successfully updated conf.json to change appName to Truist-AI"
       when: conf_json_result is changed
+      tags:
+        - clone
+        - configure
+        - rebuild
+
+    - name: Warn if conf.json doesn't exist
+      debug:
+        msg: "WARNING: conf.json file not found at {{ conf_json_path }}. Skipping modification."
+      when: not conf_json_exists.stat.exists
       tags:
         - clone
         - configure
