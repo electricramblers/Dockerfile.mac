@@ -307,7 +307,7 @@
 
     - name: Debug conf.json modification result
       debug:
-        msg: "Successfully updated conf.json to change appName to Truist-AI"
+        msg: "Successfully updated conf.json to change appName."
       when: conf_json_result is changed
       tags:
         - clone
