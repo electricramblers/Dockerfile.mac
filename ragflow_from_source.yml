@@ -1,0 +1,122 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars:
+    ragflow_repo: "https://github.com/infiniflow/ragflow.git"
+    ragflow_dir: "{{ ansible_env.HOME }}/ragflow"
+    python_version: "3.10"
+    venv_name: ".venv"
+    venv_path: "{{ ragflow_dir }}/{{ venv_name }}"
+    base_compose_file: "{{ ragflow_dir }}/docker/docker-compose-base.yml"
+    service_conf_template: "{{ ragflow_dir }}/docker/service_conf.yaml.template"
+    etc_hosts_line: "127.0.0.1       es01 infinity mysql minio redis"
+    mysql_port: "5455"
+    es_port: "1200"
+    entrypoint_path: "{{ ragflow_dir }}/docker/entrypoint.sh"
+    conf_path: "{{ ragflow_dir }}/conf/service_conf.yaml"
+    web_dir: "{{ ragflow_dir }}/web"
+    umi_config: "{{ web_dir }}/.umirc.ts"
+    frontend_port: "9380"
+
+  tasks:
+    - name: Clone the RAGFlow repository
+      git:
+        repo: "{{ ragflow_repo }}"
+        dest: "{{ ragflow_dir }}"
+        version: "develop" # or your desired branch
+        force: yes
+
+    - name: Install pipx
+      command: pip3 install --user pipx
+      ignore_errors: true
+      changed_when: false
+
+    - name: Ensure pipx is in path
+      command: pipx ensurepath
+      ignore_errors: true
+      changed_when: false
+
+    - name: Install uv
+      command: pipx install uv
+      ignore_errors: true
+      changed_when: false
+
+    - name: Install Python dependencies (slim)
+      command: uv sync --python {{ python_version }}
+      args:
+        chdir: "{{ ragflow_dir }}"
+
+    - name: Launch third-party services
+      command: docker compose -f {{ base_compose_file }} up -d
+      args:
+        chdir: "{{ ragflow_dir }}"
+
+    - name: Add line to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ etc_hosts_line }}"
+        state: present
+
+    - name: Update mysql port in service_conf.yaml.template
+      replace:
+        path: "{{ service_conf_template }}"
+        regexp: "port: 3306"
+        replace: "port: {{ mysql_port }}"
+
+    - name: Update es port in service_conf.yaml.template
+      replace:
+        path: "{{ service_conf_template }}"
+        regexp: "port: 9200"
+        replace: "port: {{ es_port }}"
+
+    - name: Comment out nginx in entrypoint.sh
+      replace:
+        path: "{{ entrypoint_path }}"
+        regexp: "^/usr/sbin/nginx"
+        replace: "#/usr/sbin/nginx"
+
+    - name: Activate the Python virtual environment (dummy task for subsequent commands)
+      command: echo "Virtual environment activated"
+      args:
+        chdir: "{{ ragflow_dir }}"
+      environment:
+        PYTHONPATH: "{{ ragflow_dir }}"
+
+    - name: Launch the RAGFlow backend service (task_executor)
+      command: python rag/svr/task_executor.py 1
+      args:
+        chdir: "{{ ragflow_dir }}"
+      environment:
+        PYTHONPATH: "{{ ragflow_dir }}"
+        LD_PRELOAD: "/usr/lib/x86_64-linux-gnu/libjemalloc.so.2" # Adjust path if needed
+
+    - name: Launch the RAGFlow backend service (api server)
+      command: python api/ragflow_server.py
+      args:
+        chdir: "{{ ragflow_dir }}"
+      environment:
+        PYTHONPATH: "{{ ragflow_dir }}"
+
+    - name: Install frontend dependencies
+      command: npm install
+      args:
+        chdir: "{{ web_dir }}"
+
+    - name: Update proxy.target in .umirc.ts
+      replace:
+        path: "{{ umi_config }}"
+        regexp: "proxy.target: 'http://localhost:8000'"
+        replace: "proxy.target: 'http://127.0.0.1:{{ frontend_port }}'"
+
+    - name: Start up the RAGFlow frontend service
+      command: npm run dev
+      args:
+        chdir: "{{ web_dir }}"
+      async: 45
+      poll: 5
+
+    - name: Final message
+      debug:
+        msg: "RAGFlow has been successfully launched from source. Access the web UI at http://127.0.0.1:<PORT>/ (check the npm output for the actual port)."
