@@ -266,21 +266,12 @@
         - configure
         - rebuild
 
-    - name: Check if already patched
-      stat:
-        path: "{{ conf_json_path }}.patched"
-      register: patched_file
-      tags:
-        - clone
-        - configure
-        - rebuild
-
     - name: Copy patch file from repository if it exists
       copy:
         src: "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
         dest: "{{ base_dir }}/docker/crttai.patch"
         remote_src: no
-      when: repo_patch_file.stat.exists and not patched_file.stat.exists
+      when: repo_patch_file.stat.exists
       tags:
         - clone
         - configure
@@ -293,7 +284,6 @@
         remote_src: no
       when:
         - conf_json_exists.stat.exists
-        - not patched_file.stat.exists
       tags:
         - clone
         - configure
@@ -309,18 +299,7 @@
         decrypt: true
       when:
         - conf_json_exists.stat.exists
-        - not patched_file.stat.exists
       register: conf_json_result
-      tags:
-        - clone
-        - configure
-        - rebuild
-
-    - name: Create patched file marker
-      file:
-        path: "{{ conf_json_path }}.patched"
-        state: touch
-      when: conf_json_result is changed
       tags:
         - clone
         - configure
