@@ -4,13 +4,15 @@
   gather_facts: true
 
   vars_files:
-    - vault_vars.yml
+    - Ansible_Files/vault_vars.yml
 
   vars:
-    version: "1.7"
+    version: "2.0"
+
+    development: yes #do a developers install instead of building containers
 
     # Directory paths
-    base_dir: "{{ playbook_dir }}"
+    base_dir: "{{ working_directory }}"
     docker_volume_path: "{{ ansible_env.HOME }}/volumes/rf"
 
     # File paths
@@ -22,7 +24,7 @@
     # Configuration values
     service_name: "ragflow"
     new_image_name: "infiniflow/ragflow:nightly"
-    repo_branch: "develop"
+    repo_branch: "develop" #This is the ragflow repo or fork branch you should clone
 
     # File content replacements
     xgboost_replacements:
@@ -35,7 +37,7 @@
         new: "MACOS=1"
       timezone:
         old: "TIMEZONE='Asia/Shanghai'"
-        new: "TIMEZONE=America/Denver"
+        new: "TIMEZONE='America/Denver'"
       lighten: "LIGHTEN=0"
       volume_dir: "DOCKER_VOLUME_DIRECTORY={{ docker_volume_path }}"
 
@@ -67,7 +69,7 @@
 
     # Dependencies installation
     - name: Install required Python packages
-      pip:
+      ansible.builtin.pip:
         name: "{{ item }}"
       loop:
         - pyyaml
@@ -114,6 +116,13 @@
       changed_when: false
       when: "'rebuild' in ansible_run_tags"
       tags: [rebuild]
+
+    - name: Clone the RagFlow repository to the working directory.
+      ansible.builtin.git:
+        repo: "{{ ragflow_repo }}"
+        dest: "{{ working_directory }}"
+        update: yes
+        version: "{{ repo_branch }}"
 
     # File modifications
     - name: Update configuration files
@@ -301,13 +310,14 @@
         chdir: "{{ base_dir }}"
       register: mac_build_result
       ignore_errors: true
+      when: not development
       tags: [rebuild]
 
     - name: Save build output to log file
       copy:
         content: "{{ mac_build_result.stdout + '\n' + mac_build_result.stderr }}"
         dest: "{{ log_file }}"
-      when: mac_build_result.rc != 0 or mac_build_result.stdout != "" or mac_build_result.stderr != ""
+        when: mac_build_result.rc != 0 or mac_build_result.stdout != "" or mac_build_result.stderr != "" and development == 'no'
       tags: [rebuild]
 
     # Takedown tasks
@@ -338,5 +348,5 @@
         - name: Final success message
           debug:
             msg: "RagFlow has been successfully installed and started on your MacOS system. Access the web UI at http://localhost"
-      when: "'takedown' not in ansible_run_tags"
+      when: "'takedown' not in ansible_run_tags and not development"
       tags: [compose, configure, rebuild]
