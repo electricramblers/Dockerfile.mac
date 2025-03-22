@@ -116,60 +116,60 @@
       block:
         # pyproject.toml modifications
         - name: Backup pyproject.toml
-          copy:
+          ansible.builtin.copy:
             src: "{{ pyproject_toml_path }}"
             dest: "{{ pyproject_toml_path }}.bak"
             remote_src: yes
 
         - name: Update xgboost version in pyproject.toml
-          replace:
+          ansible.builtin.replace:
             path: "{{ pyproject_toml_path }}"
             regexp: "{{ xgboost_replacements.old }}"
             replace: "{{ xgboost_replacements.new }}"
           register: pyproject_toml_result
 
         - name: Report changes to pyproject.toml
-          debug:
+          ansible.builtin.debug:
             msg: "Updated xgboost version in {{ pyproject_toml_path }}"
           when: pyproject_toml_result is changed
 
         # .env file modifications
         - name: Backup .env file
-          copy:
+          ansible.builtin.copy:
             src: "{{ env_file_path }}"
             dest: "{{ env_file_path }}.bak"
             remote_src: yes
 
         - name: Set time zone in environment file
-          replace:
+          ansible.builtin.replace:
             path: "{{ env_file_path }}"
             regexp: "{{ env_file_changes.timezone.old }}"
             replace: "{{ env_file_changes.timezone.new }}"
           register: time_zone_result
 
         - name: Enable MacOS mode in environment file
-          replace:
+          ansible.builtin.replace:
             path: "{{ env_file_path }}"
             regexp: "{{ env_file_changes.macos.old }}"
             replace: "{{ env_file_changes.macos.new }}"
           register: env_file_result
 
         - name: Add LIGHTEN=0 to environment file
-          lineinfile:
+          ansible.builtin.lineinfile:
             path: "{{ env_file_path }}"
             line: "{{ env_file_changes.lighten }}"
             insertafter: EOF
           register: lighten_result
 
         - name: Add DOCKER_VOLUME_DIRECTORY to environment file
-          lineinfile:
+          ansible.builtin.lineinfile:
             path: "{{ env_file_path }}"
             line: "{{ env_file_changes.volume_dir }}"
             insertafter: EOF
           register: volume_result
 
         - name: Report changes to environment file
-          debug:
+          ansible.builtin.debug:
             msg: "{{ item.msg }}"
           loop:
             - { msg: "Enabled MacOS mode in {{ env_file_path }}", condition: "{{ env_file_result is changed }}" }
@@ -205,7 +205,7 @@
     - name: Setup from repository
       block:
         - name: Clone repository
-          git:
+          ansible.builtin.git:
             repo: "{{ dockerfile_mac_repo.url }}"
             dest: "{{ dockerfile_mac_repo.dest }}"
             version: "{{ repo_branch }}"
@@ -223,21 +223,23 @@
 
         # Use the results of the stat module
         - name: Copy patch file from repository if it exists
-          copy:
+          ansible.builtin.copy:
             src: "{{ dockerfile_mac_repo.dest }}/Patches/crttai.patch"
             dest: "{{ base_dir }}/docker/crttai.patch"
-            remote_src: yes
+            remote_src: no
+            decrypt: yes
           when: stat_results.results[0].stat.exists
 
         - name: Create backup of conf.json before patching
-          copy:
+          ansible.builtin.copy:
             src: "{{ conf_json_path }}"
             dest: "{{ conf_json_path }}.bak"
-            remote_src: yes
+            remote_src: no
+            decrypt: yes
           when: stat_results.results[2].stat.exists
 
         - name: Update conf.json with new app name
-          copy:
+          ansible.builtin.copy:
             content: |
               {
                 "appName": "Truist-AI"
@@ -247,31 +249,33 @@
           register: conf_json_result
 
         - name: Report conf.json modification
-          debug:
+          ansible.builtin.debug:
             msg: "Successfully updated conf.json to change appName."
           when: conf_json_result is changed
 
         - name: Warn if conf.json doesn't exist
-          debug:
+          ansible.builtin.debug:
             msg: "WARNING: conf.json file not found at {{ conf_json_path }}. Skipping modification."
           when: not stat_results.results[2].stat.exists
 
         # Copy logo files
         - name: Copy logo files
-          copy:
+          ansible.builtin.copy:
             src: "{{ dockerfile_mac_repo.dest }}/Images/bannerlogo.svg"
             dest: "{{ item }}"
-            remote_src: yes
+            remote_src: no
+            decrypt: yes
           loop:
             - "{{ base_dir }}/intergrations/extension_chrome/assets/logo.svg"
             - "{{ base_dir }}/web/public/logo.svg"
 
         # Copy configuration files
         - name: Copy configuration files
-          copy:
+          ansible.builtin.copy:
             src: "{{ dockerfile_mac_repo.dest }}/RF_Files/{{ item.src }}"
             dest: "{{ base_dir }}/{{ item.dest }}"
-            remote_src: yes
+            remote_src: no
+            decrypt: yes
           loop:
             - { src: "Dockerfile.mac", dest: "Dockerfile.mac" }
             - { src: "docker-compose-mac.yml", dest: "docker/docker-compose-mac.yml" }
@@ -279,7 +283,7 @@
 
         # Clean up
         - name: Clean up the cloned repository
-          file:
+          ansible.builtin.file:
             path: "{{ dockerfile_mac_repo.dest }}"
             state: absent
       tags: [clone, configure, rebuild]
