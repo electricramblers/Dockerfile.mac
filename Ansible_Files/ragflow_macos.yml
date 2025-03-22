@@ -229,27 +229,8 @@
           stat:
             path: "{{ item.path }}"
           loop:
-            - { path: "{{ dockerfile_mac_repo.dest }}/Patches/crttai.patch", name: "repo_patch_file" }
-            - { path: "{{ base_dir }}/docker/crttai.patch", name: "local_patch_file" }
             - { path: "{{ conf_json_path }}", name: "conf_json_exists" }
           register: stat_results
-
-        # Use the results of the stat module
-        - name: Copy patch file from repository if it exists
-          ansible.builtin.copy:
-            src: "{{ dockerfile_mac_repo.dest }}/Patches/crttai.patch"
-            dest: "{{ base_dir }}/docker/crttai.patch"
-            remote_src: no
-            decrypt: yes
-          when: stat_results.results[0].stat.exists
-
-        - name: Create backup of conf.json before patching
-          ansible.builtin.copy:
-            src: "{{ conf_json_path }}"
-            dest: "{{ conf_json_path }}.bak"
-            remote_src: no
-            decrypt: yes
-          when: stat_results.results[2].stat.exists
 
         - name: Update conf.json with new app name
           ansible.builtin.copy:
