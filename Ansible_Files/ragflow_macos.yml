@@ -4,26 +4,27 @@
   gather_facts: true
 
   vars:
+    version: "1.5"
     # Directory paths
     base_dir: "{{ playbook_dir }}"
     docker_volume_path: "{{ ansible_env.HOME }}/volumes/rf"
-    
+
     # File paths
     pyproject_toml_path: "{{ base_dir }}/pyproject.toml"
     env_file_path: "{{ base_dir }}/docker/.env"
     conf_json_path: "{{ base_dir }}/web/src/conf.json"
     log_file: "{{ base_dir }}/ansible_build.log"
-    
+
     # Configuration values
     service_name: "ragflow"
     new_image_name: "infiniflow/ragflow:nightly"
     repo_branch: "develop"
-    
+
     # File content replacements
     xgboost_replacements:
       old: "xgboost==1.5.0"
       new: "xgboost==1.6.0"
-    
+
     env_file_changes:
       macos:
         old: "# MACOS=1"
@@ -33,7 +34,7 @@
         new: "TIMEZONE=America/Denver"
       lighten: "LIGHTEN=0"
       volume_dir: "DOCKER_VOLUME_DIRECTORY={{ docker_volume_path }}"
-    
+
     # External resources
     dockerfile_mac_repo:
       url: "https://github.com/electricramblers/Dockerfile.mac.git"
@@ -53,7 +54,7 @@
             base_dir: "{{ playbook_dir }}"
           when: playbook_dir | basename == "ragflow"
           tags: [compose, clone, rebuild]
-        
+
         - name: Verify correct directory
           fail:
             msg: "The playbook must be run from within the 'ragflow' directory."
@@ -78,19 +79,19 @@
           register: podman_check
           ignore_errors: true
           changed_when: false
-          
+
         - name: Check for docker
           command: which docker
           register: docker_check
           ignore_errors: true
           changed_when: false
-          
+
         - name: Set container engine based on availability
           set_fact:
             container_engine: >-
               {% if podman_check.rc == 0 %}podman{% elif docker_check.rc == 0 %}docker{% endif %}
             build_format_option: "{{ '--format docker' if podman_check.rc == 0 else '' }}"
-            
+
         - name: Fail if no container engine is found
           fail:
             msg: "No container engine found. Please install docker or podman and try again."
@@ -119,54 +120,54 @@
             src: "{{ pyproject_toml_path }}"
             dest: "{{ pyproject_toml_path }}.bak"
             remote_src: yes
-          
+
         - name: Update xgboost version in pyproject.toml
           replace:
             path: "{{ pyproject_toml_path }}"
             regexp: "{{ xgboost_replacements.old }}"
             replace: "{{ xgboost_replacements.new }}"
           register: pyproject_toml_result
-          
+
         - name: Report changes to pyproject.toml
           debug:
             msg: "Updated xgboost version in {{ pyproject_toml_path }}"
           when: pyproject_toml_result is changed
-          
+
         # .env file modifications
         - name: Backup .env file
           copy:
             src: "{{ env_file_path }}"
             dest: "{{ env_file_path }}.bak"
             remote_src: yes
-          
+
         - name: Set time zone in environment file
           replace:
             path: "{{ env_file_path }}"
             regexp: "{{ env_file_changes.timezone.old }}"
             replace: "{{ env_file_changes.timezone.new }}"
           register: time_zone_result
-          
+
         - name: Enable MacOS mode in environment file
           replace:
             path: "{{ env_file_path }}"
             regexp: "{{ env_file_changes.macos.old }}"
             replace: "{{ env_file_changes.macos.new }}"
           register: env_file_result
-          
+
         - name: Add LIGHTEN=0 to environment file
           lineinfile:
             path: "{{ env_file_path }}"
             line: "{{ env_file_changes.lighten }}"
             insertafter: EOF
           register: lighten_result
-          
+
         - name: Add DOCKER_VOLUME_DIRECTORY to environment file
           lineinfile:
             path: "{{ env_file_path }}"
             line: "{{ env_file_changes.volume_dir }}"
             insertafter: EOF
           register: volume_result
-          
+
         - name: Report changes to environment file
           debug:
             msg: "{{ item.msg }}"
@@ -185,14 +186,14 @@
           command: python download_deps.py
           args:
             chdir: "{{ base_dir }}"
-          
+
         - name: Build dependencies image
           command: "{{ container_engine }} build -f Dockerfile.deps -t infiniflow/ragflow_deps {{ build_format_option }} ."
           args:
             chdir: "{{ base_dir }}"
           register: deps_build_result
           ignore_errors: true
-          
+
         - name: Save dependencies build output to log file
           copy:
             content: "{{ deps_build_result.stdout + '\n' + deps_build_result.stderr }}"
@@ -209,7 +210,7 @@
             dest: "{{ dockerfile_mac_repo.dest }}"
             version: "{{ repo_branch }}"
             force: yes
-          
+
         # Check for files
         - name: Check if files exist
           stat:
@@ -219,7 +220,7 @@
             - { path: "{{ dockerfile_mac_repo.dest }}/Patches/crttai.patch", register: repo_patch_file }
             - { path: "{{ base_dir }}/docker/crttai.patch", register: local_patch_file }
             - { path: "{{ conf_json_path }}", register: conf_json_exists }
-          
+
         # Copy files from repository
         - name: Copy patch file from repository if it exists
           copy:
@@ -227,14 +228,14 @@
             dest: "{{ base_dir }}/docker/crttai.patch"
             remote_src: yes
           when: repo_patch_file.stat.exists
-          
+
         - name: Create backup of conf.json before patching
           copy:
             src: "{{ conf_json_path }}"
             dest: "{{ conf_json_path }}.bak"
             remote_src: yes
           when: conf_json_exists.stat.exists
-          
+
         - name: Update conf.json with new app name
           copy:
             content: |
@@ -244,17 +245,17 @@
             dest: "{{ conf_json_path }}"
           when: conf_json_exists.stat.exists
           register: conf_json_result
-          
+
         - name: Report conf.json modification
           debug:
             msg: "Successfully updated conf.json to change appName."
           when: conf_json_result is changed
-          
+
         - name: Warn if conf.json doesn't exist
           debug:
             msg: "WARNING: conf.json file not found at {{ conf_json_path }}. Skipping modification."
           when: not conf_json_exists.stat.exists
-          
+
         # Copy logo files
         - name: Copy logo files
           copy:
@@ -264,7 +265,7 @@
           loop:
             - "{{ base_dir }}/intergrations/extension_chrome/assets/logo.svg"
             - "{{ base_dir }}/web/public/logo.svg"
-          
+
         # Copy configuration files
         - name: Copy configuration files
           copy:
@@ -275,7 +276,7 @@
             - { src: "Dockerfile.mac", dest: "Dockerfile.mac" }
             - { src: "docker-compose-mac.yml", dest: "docker/docker-compose-mac.yml" }
             - { src: "service_conf.yaml.template", dest: "docker/service_conf.yaml.template" }
-          
+
         # Clean up
         - name: Clean up the cloned repository
           file:
@@ -291,7 +292,7 @@
       register: mac_build_result
       ignore_errors: true
       tags: [rebuild]
-      
+
     - name: Save build output to log file
       copy:
         content: "{{ mac_build_result.stdout + '\n' + mac_build_result.stderr }}"
@@ -306,10 +307,10 @@
           command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml down"
           args:
             chdir: "{{ base_dir }}"
-          
+
         - name: Prune container system
           command: "{{ container_engine }} system prune -af"
-          
+
         - name: Takedown complete message
           debug:
             msg: "RagFlow containers have been stopped and removed. System has been pruned."
@@ -323,7 +324,7 @@
           command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml up -d"
           args:
             chdir: "{{ base_dir }}"
-          
+
         - name: Final success message
           debug:
             msg: "RagFlow has been successfully installed and started on your MacOS system. Access the web UI at http://localhost"
