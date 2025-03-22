@@ -81,13 +81,13 @@
     - name: Determine container engine (docker or podman)
       block:
         - name: Check for podman
-          command: which podman
+          ansible.builtin.command: which podman
           register: podman_check
           ignore_errors: true
           changed_when: false
 
         - name: Check for docker
-          command: which docker
+          ansible.builtin.command: which docker
           register: docker_check
           ignore_errors: true
           changed_when: false
@@ -104,14 +104,14 @@
           when: podman_check.rc != 0 and docker_check.rc != 0
       rescue:
         - name: Display error message
-          debug:
+          ansible.builtin.debug:
             msg: "An error occurred while determining the container engine."
           failed_when: true
       tags: [compose, configure, rebuild, takedown]
 
     # Handle container cleanup for rebuild
     - name: Stop and remove ragflow-server container if rebuilding
-      command: "{{ container_engine }} rm -f ragflow-server"
+      ansible.builtin.command: "{{ container_engine }} rm -f ragflow-server"
       ignore_errors: true
       changed_when: false
       when: "'rebuild' in ansible_run_tags"
@@ -151,7 +151,7 @@
           ansible.builtin.copy:
             src: "{{ env_file_path }}"
             dest: "{{ env_file_path }}.bak"
-            remote_src: yes
+            remote_src: no
 
         - name: Set time zone in environment file
           ansible.builtin.replace:
@@ -212,7 +212,6 @@
             content: "{{ deps_build_result.stdout + '\n' + deps_build_result.stderr }}"
             dest: "{{ log_file }}"
           when: deps_build_result.rc != 0 or deps_build_result.stdout != "" or deps_build_result.stderr != ""
-      tags: [always]
 
     # Repository handling
     - name: Setup from repository
@@ -311,6 +310,7 @@
 
         - name: Prune container system
           command: "{{ container_engine }} system prune -af"
+          when: "'destroy' in ansible_run_tags"
 
         - name: Takedown complete message
           debug:
