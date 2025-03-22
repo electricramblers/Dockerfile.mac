@@ -3,75 +3,101 @@
   connection: local
   gather_facts: true
 
+  vars_files:
+    - Ansible_Files/vault_vars.yml
+
   vars:
-    base_dir: "{{ playbook_dir }}" # default to playbook directory, override if necessary
+    version: "2.0"
+
+    development: yes #do a developers install instead of building containers
+
+    # Directory paths
+    base_dir: "{{ working_directory }}"
+    docker_volume_path: "{{ ansible_env.HOME }}/volumes/rf"
+
+    # File paths
     pyproject_toml_path: "{{ base_dir }}/pyproject.toml"
     env_file_path: "{{ base_dir }}/docker/.env"
+    conf_json_path: "{{ base_dir }}/web/src/conf.json"
+    log_file: "{{ base_dir }}/ansible_build.log"
+
+    # Configuration values
     service_name: "ragflow"
     new_image_name: "infiniflow/ragflow:nightly"
-    old_xgboost_line: "xgboost==1.5.0"
-    new_xgboost_line: "xgboost==1.6.0"
-    old_line: "# MACOS=1"
-    new_line: "MACOS=1"
-    lighten_line: "LIGHTEN=0"
-    original_time_zone: "TIMEZONE='Asia/Shanghai'"
-    new_time_zone: "TIMEZONE=America/Denver"
-    dockerfile_mac_url: "https://github.com/electricramblers/Dockerfile.mac.git"
-    dockerfile_mac_dest: "{{ base_dir }}/Dockerfile.mac"
-    docker_volume_path: "{{ ansible_env.HOME }}/volumes/rf"
-    env_volume_line: "DOCKER_VOLUME_DIRECTORY={{ docker_volume_path }}"
-    log_file: "{{ base_dir }}/ansible_build.log"
-    repo_branch: "develop" # Default branch
+    repo_branch: "develop" #This is the ragflow repo or fork branch you should clone
+
+    # File content replacements
+    xgboost_replacements:
+      old: "xgboost==1.5.0"
+      new: "xgboost==1.6.0"
+
+    env_file_changes:
+      macos:
+        old: "# MACOS=1"
+        new: "MACOS=1"
+      timezone:
+        old: "TIMEZONE='Asia/Shanghai'"
+        new: "TIMEZONE='America/Denver'"
+      lighten: "LIGHTEN=0"
+      volume_dir: "DOCKER_VOLUME_DIRECTORY={{ docker_volume_path }}"
+
+    # External resources
+    dockerfile_mac_repo:
+      url: "https://github.com/electricramblers/Dockerfile.mac.git"
+      dest: "{{ base_dir }}/dockerfile_mac_repo"
 
   tasks:
-    - name: Check if running on macOS
+    # Validation checks
+    - name: Ensure running on macOS
       fail:
         msg: "This playbook should only be run on macOS."
       when: ansible_os_family != "Darwin"
 
-    - name: Set BASE_DIR if running from the 'ragflow' directory
-      set_fact:
-        base_dir: "{{ playbook_dir }}"
-      when: playbook_dir | basename == "ragflow"
-      tags:
-        - compose
-        - clone
-        - rebuild
-
-    - name: Check if running from the 'ragflow' directory
-      fail:
-        msg: "The playbook is not being run from the 'ragflow' directory.\nYou need to run the playbook from within the 'ragflow' directory."
-      when: base_dir | basename != "ragflow"
-
-    - name: Install pyyaml
-      pip:
-        name: pyyaml
-      register: yaml_install_result
-
-    - name: Determine container engine
+    - name: Ensure running from the 'ragflow' directory
       block:
-        - name: Check if podman is available
+        - name: Set base_dir if running from the 'ragflow' directory
+          set_fact:
+            base_dir: "{{ playbook_dir }}"
+          when: playbook_dir | basename == "ragflow"
+          tags: [compose, clone, rebuild]
+
+        - name: Verify correct directory
+          fail:
+            msg: "The playbook must be run from within the 'ragflow' directory."
+          when: base_dir | basename != "ragflow"
+      tags: [always]
+
+    # Dependencies installation
+    - name: Install required Python packages
+      ansible.builtin.pip:
+        name: "{{ item }}"
+      loop:
+        - pyyaml
+        - huggingface_hub
+        - nltk
+      tags: [always]
+
+    # Container engine detection
+    - name: Determine container engine (docker or podman)
+      block:
+        - name: Check for podman
           command: which podman
           register: podman_check
           ignore_errors: true
           changed_when: false
-        - name: Check if docker is available
+
+        - name: Check for docker
           command: which docker
           register: docker_check
           ignore_errors: true
           changed_when: false
-        - name: Set container engine to podman if both are available
+
+        - name: Set container engine based on availability
           set_fact:
-            container_engine: "podman"
-          when: podman_check.rc == 0 and docker_check.rc == 0
-        - name: Set container engine to podman if only podman is available
-          set_fact:
-            container_engine: "podman"
-          when: podman_check.rc == 0 and docker_check.rc != 0
-        - name: Set container engine to docker if only docker is available
-          set_fact:
-            container_engine: "docker"
-          when: podman_check.rc != 0 and docker_check.rc == 0
+            container_engine: >-
+              {% if podman_check.rc == 0 %}podman{% elif docker_check.rc == 0 %}docker{% endif %}
+            build_format_option: "{{ '--format docker' if podman_check.rc == 0 else '' }}"
+
         - name: Fail if no container engine is found
           fail:
             msg: "No container engine found. Please install docker or podman and try again."
@@ -81,357 +107,227 @@
           debug:
             msg: "An error occurred while determining the container engine."
           failed_when: true
-      tags:
-        - compose
-        - configure
-        - rebuild
-        - takedown
+      tags: [compose, configure, rebuild, takedown]
 
-    - name: Backup pyproject.toml
-      command: cp "{{ pyproject_toml_path }}" "{{ pyproject_toml_path }}.bak"
-    - name: Update xgboost version in pyproject.toml
-      replace:
-        path: "{{ pyproject_toml_path }}"
-        regexp: "{{ old_xgboost_line }}"
-        replace: "{{ new_xgboost_line }}"
-      when:
-        - ansible_os_family == "Darwin"
-        - pyproject_toml_path is defined
-        - old_xgboost_line is defined
-        - new_xgboost_line is defined
-      register: pyproject_toml_result
-      check_mode: no
-
-    - name: Report changes to pyproject.toml
-      debug:
-        msg: "Updated xgboost version in {{ pyproject_toml_path }}"
-      when: pyproject_toml_result is changed
-
-    - name: Backup .env file
-      command: cp "{{ env_file_path }}" "{{ env_file_path }}.bak"
-
-    - name: Set time zone in environment file
-      replace:
-        path: "{{ env_file_path }}"
-        regexp: "{{ original_time_zone }}"
-        replace: "{{ new_time_zone }}"
-      when:
-        - ansible_os_family == "Darwin"
-        - env_file_path is defined
-        - old_line is defined
-        - new_line is defined
-      register: time_zone_result
-      check_mode: no
-
-    - name: Enable MacOS mode in environment file
-      replace:
-        path: "{{ env_file_path }}"
-        regexp: "{{ old_line }}"
-        replace: "{{ new_line }}"
-      when:
-        - ansible_os_family == "Darwin"
-        - env_file_path is defined
-        - old_line is defined
-        - new_line is defined
-      register: env_file_result
-      check_mode: no
-
-    - name: Add LIGHTEN=0 to environment file
-      lineinfile:
-        path: "{{ env_file_path }}"
-        line: "{{ lighten_line }}"
-        insertafter: EOF
-      when:
-        - ansible_os_family == "Darwin"
-        - env_file_path is defined
-        - lighten_line is defined
-      register: lighten_result
-      check_mode: no
-
-    - name: Add DOCKER_VOLUME_DIRECTORY to environment file
-      lineinfile:
-        path: "{{ env_file_path }}"
-        line: "{{ env_volume_line }}"
-        insertafter: EOF
-      when:
-        - ansible_os_family == "Darwin"
-        - env_file_path is defined
-        - env_volume_line is defined
-      register: volume_result
-      check_mode: no
-
-    - name: Report changes to environment file for MACOS setting
-      debug:
-        msg: "Enabled MacOS mode in {{ env_file_path }}"
-      when: env_file_result is changed
-
-    - name: Report changes to environment file for LIGHTEN setting
-      debug:
-        msg: "Added {{ lighten_line }} to {{ env_file_path }}"
-      when: lighten_result is changed
-
-    - name: Change working directory
-      changed_when: false
-      command: pwd
-      register: pwd_result
-
-    - name: Set fact that we are in the correct directory
-      changed_when: false
-      set_fact:
-        current_directory_is_correct: "{{ pwd_result.stdout == base_dir }}"
-      when:
-        - ansible_os_family == "Darwin"
-        - base_dir is defined
-        - pwd_result is defined
-
-    - name: Change directory to base_dir
-      command: chdir "{{ base_dir }}"
-      args:
-        chdir: "{{ base_dir }}"
-      when: not current_directory_is_correct
-
-    - name: Install huggingface_hub and nltk
-      pip:
-        name: "{{ item }}"
-      loop:
-        - huggingface_hub
-        - nltk
-
-    - name: Download dependencies
-      command: python download_deps.py
-      args:
-        chdir: "{{ base_dir }}"
-
-    - name: Build dependencies image
-      command: "{{ container_engine }} build -f Dockerfile.deps -t infiniflow/ragflow_deps {{ '--format docker' if container_engine == 'podman' else '' }} ."
-      args:
-        chdir: "{{ base_dir }}"
-      register: deps_build_result
+    # Handle container cleanup for rebuild
+    - name: Stop and remove ragflow-server container if rebuilding
+      command: "{{ container_engine }} rm -f ragflow-server"
       ignore_errors: true
+      changed_when: false
+      when: "'rebuild' in ansible_run_tags"
+      tags: [rebuild]
 
-    - name: Save dependencies build output to log file
-      copy:
-        content: "{{ deps_build_result.stdout + '\n' + deps_build_result.stderr }}"
-        dest: "{{ log_file }}"
-      when: deps_build_result.rc != 0 or deps_build_result.stdout != "" or deps_build_result.stderr != ""
-
-    #-------------------------------------------------------------------------------
-    # Repo  Stuff
-    #-------------------------------------------------------------------------------
-
-    - name: Ensure repository is cloned
-      git:
-        repo: "{{ dockerfile_mac_url }}"
-        dest: "{{ base_dir }}/dockerfile_mac_repo"
+    - name: Clone the RagFlow repository to the working directory.
+      ansible.builtin.git:
+        repo: "{{ ragflow_repo }}"
+        dest: "{{ working_directory }}"
+        update: yes
         version: "{{ repo_branch }}"
-        force: yes
-      tags:
-        - clone
-        - configure
-        - rebuild
 
-    - name: Decrypt crttai.patch
-      command: ansible-vault decrypt "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch" --output "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
-      args:
-        chdir: "{{ base_dir }}"
-      when:
-        - lookup('env', 'ANSIBLE_VAULT_PASSWORD_FILE') != ''
-      tags:
-        - clone
-        - configure
-        - rebuild
+    # File modifications
+    - name: Update configuration files
+      block:
+        # pyproject.toml modifications
+        - name: Backup pyproject.toml
+          ansible.builtin.copy:
+            src: "{{ pyproject_toml_path }}"
+            dest: "{{ pyproject_toml_path }}.bak"
+            remote_src: yes
 
-    - name: Copy crttai.patch to the docker directory
-      copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/Patches/crttai.patch"
-        dest: "{{ base_dir }}/docker/crttai.patch"
-        remote_src: yes
-      tags:
-        - clone
-        - configure
-        - rebuild
+        - name: Update xgboost version in pyproject.toml
+          ansible.builtin.replace:
+            path: "{{ pyproject_toml_path }}"
+            regexp: "{{ xgboost_replacements.old }}"
+            replace: "{{ xgboost_replacements.new }}"
+          register: pyproject_toml_result
 
-    - name: Check if patch file exists
-      stat:
-        path: "{{ base_dir }}/docker/crttai.patch"
-      register: patch_file
-      tags:
-        - clone
-        - configure
-        - rebuild
+        - name: Report changes to pyproject.toml
+          ansible.builtin.debug:
+            msg: "Updated xgboost version in {{ pyproject_toml_path }}"
+          when: pyproject_toml_result is changed
 
-    - name: Check if already patched
-      stat:
-        path: "{{ base_dir }}/web/src/conf.json.patched"
-      register: patched_file
-      tags:
-        - clone
-        - configure
-        - rebuild
+        # .env file modifications
+        - name: Backup .env file
+          ansible.builtin.copy:
+            src: "{{ env_file_path }}"
+            dest: "{{ env_file_path }}.bak"
+            remote_src: yes
 
-    - name: Copy patch file to web/src directory
-      copy:
-        src: "{{ base_dir }}/docker/crttai.patch"
-        dest: "{{ base_dir }}/web/src/crttai.patch"
-        remote_src: yes
-      when: patch_file.stat.exists and not patched_file.stat.exists
-      tags:
-        - clone
-        - configure
-        - rebuild
+        - name: Set time zone in environment file
+          ansible.builtin.replace:
+            path: "{{ env_file_path }}"
+            regexp: "{{ env_file_changes.timezone.old }}"
+            replace: "{{ env_file_changes.timezone.new }}"
+          register: time_zone_result
 
-    - name: Apply crttai.patch
-      shell: patch -p1 -t < crttai.patch
-      args:
-        chdir: "{{ base_dir }}/web/src"
-      when: patch_file.stat.exists and not patched_file.stat.exists
-      register: patch_result
-      ignore_errors: yes
-      tags:
-        - clone
-        - configure
-        - rebuild
+        - name: Enable MacOS mode in environment file
+          ansible.builtin.replace:
+            path: "{{ env_file_path }}"
+            regexp: "{{ env_file_changes.macos.old }}"
+            replace: "{{ env_file_changes.macos.new }}"
+          register: env_file_result
 
-    - name: Debug patch result
-      debug:
-        var: patch_result
-      when: patch_result is defined
-      tags:
-        - clone
-        - configure
-        - rebuild
+        - name: Add LIGHTEN=0 to environment file
+          ansible.builtin.lineinfile:
+            path: "{{ env_file_path }}"
+            line: "{{ env_file_changes.lighten }}"
+            insertafter: EOF
+          register: lighten_result
 
-    - name: Create patched file marker
-      file:
-        path: "{{ base_dir }}/web/src/conf.json.patched"
-        state: touch
-      when: patch_result is defined and patch_result.rc == 0
-      tags:
-        - clone
-        - configure
-        - rebuild
+        - name: Add DOCKER_VOLUME_DIRECTORY to environment file
+          ansible.builtin.lineinfile:
+            path: "{{ env_file_path }}"
+            line: "{{ env_file_changes.volume_dir }}"
+            insertafter: EOF
+          register: volume_result
 
-    - name: Remove temporary patch file from web/src
-      file:
-        path: "{{ base_dir }}/web/src/crttai.patch"
-        state: absent
-      when: patch_file.stat.exists and not patched_file.stat.exists
-      tags:
-        - clone
-        - configure
-        - rebuild
+        - name: Report changes to environment file
+          ansible.builtin.debug:
+            msg: "{{ item.msg }}"
+          loop:
+            - { msg: "Enabled MacOS mode in {{ env_file_path }}", condition: "{{ env_file_result is changed }}" }
+            - { msg: "Added {{ env_file_changes.lighten }} to {{ env_file_path }}", condition: "{{ lighten_result is changed }}" }
+            - { msg: "Set timezone to {{ env_file_changes.timezone.new }}", condition: "{{ time_zone_result is changed }}" }
+            - { msg: "Set volume directory to {{ docker_volume_path }}", condition: "{{ volume_result is changed }}" }
+          when: item.condition | bool
+      tags: [always]
 
-    - name: Copy bannerlogo.svg to intergrations/extension_chrome/assets/logo.svg
-      copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/Images/bannerlogo.svg"
-        dest: "{{ base_dir }}/intergrations/extension_chrome/assets/logo.svg"
-        remote_src: yes
-      tags:
-        - clone
-        - configure
-        - rebuild
+    # Download dependencies
+    - name: Prepare dependencies
+      block:
+        - name: Download dependencies
+          command: python download_deps.py
+          args:
+            chdir: "{{ base_dir }}"
 
-    - name: Copy bannerlogo.svg to web/public/logo.svg
-      copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/Images/bannerlogo.svg"
-        dest: "{{ base_dir }}/web/public/logo.svg"
-        remote_src: yes
-      tags:
-        - clone
-        - configure
-        - rebuild
+        - name: Build dependencies image
+          command: "{{ container_engine }} build -f Dockerfile.deps -t infiniflow/ragflow_deps {{ build_format_option }} ."
+          args:
+            chdir: "{{ base_dir }}"
+          register: deps_build_result
+          ignore_errors: true
 
-    - name: Copy Dockerfile.mac to the desired location
-      copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/Dockerfile.mac"
-        dest: "{{ base_dir }}/Dockerfile.mac"
-        remote_src: yes
-      tags:
-        - clone
-        - rebuild
+        - name: Save dependencies build output to log file
+          copy:
+            content: "{{ deps_build_result.stdout + '\n' + deps_build_result.stderr }}"
+            dest: "{{ log_file }}"
+          when: deps_build_result.rc != 0 or deps_build_result.stdout != "" or deps_build_result.stderr != ""
+      tags: [always]
 
-    - name: Copy docker-compose-mac.yml to the desired location
-      copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/docker-compose-mac.yml"
-        dest: "{{ base_dir }}/docker/docker-compose-mac.yml"
-        remote_src: yes
-      tags:
-        - clone
-        - configure
-        - rebuild
-    - name: Copy the service_conf.yaml.template to the desired location.
-      copy:
-        src: "{{ base_dir }}/dockerfile_mac_repo/RF_Files/service_conf.yaml.template"
-        dest: "{{ base_dir }}/docker/service_conf.yaml.template"
-      when:
-        - lookup('env', 'ANSIBLE_VAULT_PASSWORD_FILE') != ''
-      tags:
-        - clone
-        - configure
-        - rebuild
+    # Repository handling
+    - name: Setup from repository
+      block:
+        - name: Clone repository
+          ansible.builtin.git:
+            repo: "{{ dockerfile_mac_repo.url }}"
+            dest: "{{ dockerfile_mac_repo.dest }}"
+            version: "{{ repo_branch }}"
+            force: yes
 
-    - name: Clean up the cloned repository
-      file:
-        path: "{{ base_dir }}/dockerfile_mac_repo"
-        state: absent
-      tags:
-        - clone
-        - configure
-        - rebuild
+        # Check for files
+        - name: Check if files exist
+          stat:
+            path: "{{ item.path }}"
+          loop:
+            - { path: "{{ conf_json_path }}", name: "conf_json_exists" }
+          register: stat_results
 
+        - name: Update conf.json with new app name
+          ansible.builtin.copy:
+            content: |
+              {
+                "appName": "{{ set_new_name }}"
+              }
+            dest: "{{ conf_json_path }}"
+          when:
+            - stat_results.results[2].stat.exists
+            - set_new_name is defined
+          register: conf_json_result
+
+        - name: Report conf.json modification
+          ansible.builtin.debug:
+            msg: "Successfully updated conf.json to change appName."
+          when: conf_json_result is changed
+
+        - name: Warn if conf.json doesn't exist
+          ansible.builtin.debug:
+            msg: "WARNING: conf.json file not found at {{ conf_json_path }}. Skipping modification."
+          when: not stat_results.results[2].stat.exists
+
+        # Copy logo files
+        - name: Copy logo files
+          ansible.builtin.copy:
+            src: "{{ dockerfile_mac_repo.dest }}/Images/bannerlogo.svg"
+            dest: "{{ item }}"
+            remote_src: no
+            decrypt: yes
+          loop:
+            - "{{ base_dir }}/intergrations/extension_chrome/assets/logo.svg"
+            - "{{ base_dir }}/web/public/logo.svg"
+
+        # Copy configuration files
+        - name: Copy configuration files
+          ansible.builtin.copy:
+            src: "{{ dockerfile_mac_repo.dest }}/RF_Files/{{ item.src }}"
+            dest: "{{ base_dir }}/{{ item.dest }}"
+            remote_src: no
+            decrypt: yes
+          loop:
+            - { src: "Dockerfile.mac", dest: "Dockerfile.mac" }
+            - { src: "docker-compose-mac.yml", dest: "docker/docker-compose-mac.yml" }
+            - { src: "service_conf.yaml.template", dest: "docker/service_conf.yaml.template" }
+
+        # Clean up
+        - name: Clean up the cloned repository
+          ansible.builtin.file:
+            path: "{{ dockerfile_mac_repo.dest }}"
+            state: absent
+      tags: [clone, configure, rebuild]
+
+    # Build image
     - name: Build Ragflow image for MacOS
-      command: "{{ container_engine }} build -f Dockerfile.mac -t infiniflow/ragflow:nightly {{ '--format docker' if container_engine == 'podman' else '' }} ."
+      command: "{{ container_engine }} build -f Dockerfile.mac -t {{ new_image_name }} {{ build_format_option }} ."
       args:
         chdir: "{{ base_dir }}"
       register: mac_build_result
       ignore_errors: true
-      tags:
-        - rebuild
+      when: not development
+      tags: [rebuild]
 
     - name: Save build output to log file
       copy:
         content: "{{ mac_build_result.stdout + '\n' + mac_build_result.stderr }}"
         dest: "{{ log_file }}"
-      when: mac_build_result.rc != 0 or mac_build_result.stdout != "" or mac_build_result.stderr != ""
+        when: mac_build_result.rc != 0 or mac_build_result.stdout != "" or mac_build_result.stderr != "" and development == 'no'
+      tags: [rebuild]
 
-    # Takedown tasks - only run when takedown tag is specified
-    - name: Stop and remove containers
-      command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml down"
-      args:
-        chdir: "{{ base_dir }}"
+    # Takedown tasks
+    - name: Perform takedown if requested
+      block:
+        - name: Stop and remove containers
+          command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml down"
+          args:
+            chdir: "{{ base_dir }}"
+
+        - name: Prune container system
+          command: "{{ container_engine }} system prune -af"
+
+        - name: Takedown complete message
+          debug:
+            msg: "RagFlow containers have been stopped and removed. System has been pruned."
       when: "'takedown' in ansible_run_tags"
-      tags:
-        - takedown
+      tags: [takedown]
 
-    - name: Prune container system
-      command: "{{ container_engine }} system prune -af"
-      when: "'takedown' in ansible_run_tags"
-      tags:
-        - takedown
+    # Compose up task
+    - name: Start containers if not taking down
+      block:
+        - name: Compose up
+          command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml up -d"
+          args:
+            chdir: "{{ base_dir }}"
 
-    - name: Takedown complete message
-      debug:
-        msg: "RagFlow containers have been stopped and removed. System has been pruned."
-      when: "'takedown' in ansible_run_tags"
-      tags:
-        - takedown
-
-    # Compose up task - only run when takedown tag is NOT specified
-    - name: Compose up - TOTAL
-      command: "{{ container_engine }} compose -f {{ base_dir }}/docker/docker-compose-mac.yml up -d"
-      args:
-        chdir: "{{ base_dir }}"
-      when: "'takedown' not in ansible_run_tags"
-      tags:
-        - compose
-        - configure
-        - rebuild
-
-    - name: Final message
-      debug:
-        msg: "RagFlow has been successfully installed and started on your MacOS system. Access the web UI at http://localhost"
-      when: "'takedown' not in ansible_run_tags"
-      tags:
-        - compose
-        - configure
-        - rebuild
+        - name: Final success message
+          debug:
+            msg: "RagFlow has been successfully installed and started on your MacOS system. Access the web UI at http://localhost"
+      when: "'takedown' not in ansible_run_tags and not development"
+      tags: [compose, configure, rebuild]
