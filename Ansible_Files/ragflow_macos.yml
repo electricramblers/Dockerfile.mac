@@ -215,26 +215,26 @@
         - name: Check if files exist
           stat:
             path: "{{ item.path }}"
-          register: "{{ item.register }}"
           loop:
-            - { path: "{{ dockerfile_mac_repo.dest }}/Patches/crttai.patch", register: repo_patch_file }
-            - { path: "{{ base_dir }}/docker/crttai.patch", register: local_patch_file }
-            - { path: "{{ conf_json_path }}", register: conf_json_exists }
+            - { path: "{{ dockerfile_mac_repo.dest }}/Patches/crttai.patch", name: "repo_patch_file" }
+            - { path: "{{ base_dir }}/docker/crttai.patch", name: "local_patch_file" }
+            - { path: "{{ conf_json_path }}", name: "conf_json_exists" }
+          register: stat_results
 
-        # Copy files from repository
+        # Use the results of the stat module
         - name: Copy patch file from repository if it exists
           copy:
             src: "{{ dockerfile_mac_repo.dest }}/Patches/crttai.patch"
             dest: "{{ base_dir }}/docker/crttai.patch"
             remote_src: yes
-          when: repo_patch_file.stat.exists
+          when: stat_results.results[0].stat.exists
 
         - name: Create backup of conf.json before patching
           copy:
             src: "{{ conf_json_path }}"
             dest: "{{ conf_json_path }}.bak"
             remote_src: yes
-          when: conf_json_exists.stat.exists
+          when: stat_results.results[2].stat.exists
 
         - name: Update conf.json with new app name
           copy:
@@ -243,7 +243,7 @@
                 "appName": "Truist-AI"
               }
             dest: "{{ conf_json_path }}"
-          when: conf_json_exists.stat.exists
+          when: stat_results.results[2].stat.exists
           register: conf_json_result
 
         - name: Report conf.json modification
@@ -254,7 +254,7 @@
         - name: Warn if conf.json doesn't exist
           debug:
             msg: "WARNING: conf.json file not found at {{ conf_json_path }}. Skipping modification."
-          when: not conf_json_exists.stat.exists
+          when: not stat_results.results[2].stat.exists
 
         # Copy logo files
         - name: Copy logo files
