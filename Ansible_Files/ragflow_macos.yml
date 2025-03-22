@@ -3,8 +3,12 @@
   connection: local
   gather_facts: true
 
+  vars_files:
+    - vault_vars.yml
+
   vars:
-    version: "1.5"
+    version: "1.7"
+
     # Directory paths
     base_dir: "{{ playbook_dir }}"
     docker_volume_path: "{{ ansible_env.HOME }}/volumes/rf"
@@ -242,10 +246,12 @@
           ansible.builtin.copy:
             content: |
               {
-                "appName": "Truist-AI"
+                "appName": "{{ set_new_name }}"
               }
             dest: "{{ conf_json_path }}"
-          when: stat_results.results[2].stat.exists
+          when:
+            - stat_results.results[2].stat.exists
+            - set_new_name is defined
           register: conf_json_result
 
         - name: Report conf.json modification
