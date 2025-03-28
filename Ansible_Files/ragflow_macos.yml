@@ -134,7 +134,7 @@
           ansible.builtin.copy:
             src: "{{ pyproject_toml_path }}"
             dest: "{{ pyproject_toml_path }}.bak"
-            remote_src: yes
+            remote_src: no
 
         - name: Update xgboost version in pyproject.toml
           ansible.builtin.replace:
@@ -153,7 +153,7 @@
           ansible.builtin.copy:
             src: "{{ env_file_path }}"
             dest: "{{ env_file_path }}.bak"
-            remote_src: yes
+            remote_src: no
 
         - name: Set time zone in environment file
           ansible.builtin.replace:
@@ -208,13 +208,6 @@
             chdir: "{{ base_dir }}"
           register: deps_build_result
           ignore_errors: true
-
-        - name: Save dependencies build output to log file
-          copy:
-            content: "{{ deps_build_result.stdout + '\n' + deps_build_result.stderr }}"
-            dest: "{{ log_file }}"
-          when: deps_build_result.rc != 0 or deps_build_result.stdout != "" or deps_build_result.stderr != ""
-      tags: [always]
 
     # Repository handling
     - name: Setup from repository
