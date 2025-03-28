@@ -242,11 +242,6 @@
             msg: "Successfully updated conf.json to change appName."
           when: conf_json_result is changed
 
-        - name: Warn if conf.json doesn't exist
-          ansible.builtin.debug:
-            msg: "WARNING: conf.json file not found at {{ conf_json_path }}. Skipping modification."
-          when: not stat_results.results[2].stat.exists
-
         # Copy logo files
         - name: Copy logo files
           ansible.builtin.copy:
