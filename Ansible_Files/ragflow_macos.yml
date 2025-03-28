@@ -24,7 +24,8 @@
     # Configuration values
     service_name: "ragflow"
     new_image_name: "infiniflow/ragflow:nightly"
-    repo_branch: "develop" #This is the ragflow repo or fork branch you should clone
+    docker_mac_repo_branch: "main"
+    ragflow_repo_branch: "main" #This is the ragflow repo or fork branch you should clone
 
     # File content replacements
     xgboost_replacements:
@@ -122,7 +123,7 @@
         repo: "{{ ragflow_repo }}"
         dest: "{{ working_directory }}"
         update: yes
-        version: "{{ repo_branch }}"
+        version: "{{ ragflow_repo_branch }}"
 
     # File modifications
     - name: Update configuration files
@@ -221,16 +222,8 @@
           ansible.builtin.git:
             repo: "{{ dockerfile_mac_repo.url }}"
             dest: "{{ dockerfile_mac_repo.dest }}"
-            version: "{{ repo_branch }}"
+            version: "{{ docker_mac_repo_branch }}"
             force: yes
-
-        # Check for files
-        - name: Check if files exist
-          stat:
-            path: "{{ item.path }}"
-          loop:
-            - { path: "{{ conf_json_path }}", name: "conf_json_exists" }
-          register: stat_results
 
         - name: Update conf.json with new app name
           ansible.builtin.copy:
@@ -240,7 +233,6 @@
               }
             dest: "{{ conf_json_path }}"
           when:
-            - stat_results.results[2].stat.exists
             - set_new_name is defined
           register: conf_json_result
 

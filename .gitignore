@@ -8,3 +8,4 @@ notes.txt
 .DS_Store
 rescinded.py
 rag_response.txt
+Scripts/**
