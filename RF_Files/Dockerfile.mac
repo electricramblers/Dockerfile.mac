@@ -169,9 +169,9 @@ RUN echo "Adding NodeJS repository..." && \
     apt autoremove -y && \
     echo "Updating package lists..." && \
     apt update && \
-    echo "Installing NodeJS 20..." && \
+    echo "Installing NodeJS 20...\" && \
     apt install -y nodejs && \
-    echo "NodeJS $(node --version) installed successfully"
+    echo \"NodeJS $(node --version) installed successfully"
 
 # Install Rust with proper mirror configuration and progress tracking
 RUN echo "Installing build tools for Rust..." && \
@@ -317,10 +317,6 @@ COPY pyproject.toml uv.lock ./
 COPY docker/service_conf.yaml.template ./conf/service_conf.yaml.template
 COPY docker/entrypoint.sh docker/entrypoint-parser.sh ./
 RUN chmod +x ./entrypoint*.sh
-
-# Copy compiled web pages and version info
-COPY --from=builder /ragflow/web/dist /ragflow/web/dist
-COPY --from=builder /ragflow/VERSION /ragflow/VERSION
 
 # Add a health check for container monitoring
 HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
