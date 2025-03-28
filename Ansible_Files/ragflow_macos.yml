@@ -267,7 +267,7 @@
 
     # Build image
     - name: Build Ragflow image for MacOS
-      command: "{{ container_engine }} build -f Dockerfile.mac -t {{ new_image_name }} {{ build_format_option }} ."
+      command: "{{ container_engine }} build -f Dockerfile.mac -t {{ new_image_name }} {{ build_format_option }} --progress=plain ."
       args:
         chdir: "{{ base_dir }}"
       register: mac_build_result
