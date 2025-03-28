@@ -271,7 +271,7 @@
       args:
         chdir: "{{ base_dir }}"
       register: mac_build_result
-      ignore_errors: true
+      ignore_errors: false
       when: not development
       tags: [rebuild]
 
@@ -279,7 +279,7 @@
       copy:
         content: "{{ mac_build_result.stdout + '\n' + mac_build_result.stderr }}"
         dest: "{{ log_file }}"
-        when: mac_build_result.rc != 0 or mac_build_result.stdout != "" or mac_build_result.stderr != "" and development == 'no'
+        when: not development
       tags: [rebuild]
 
     # Takedown tasks
