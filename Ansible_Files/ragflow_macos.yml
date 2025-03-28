@@ -123,6 +123,7 @@
         repo: "{{ ragflow_repo }}"
         dest: "{{ working_directory }}"
         update: yes
+        force: yes
         version: "{{ ragflow_repo_branch }}"
 
     # File modifications
