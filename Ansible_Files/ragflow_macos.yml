@@ -9,7 +9,7 @@
   vars:
     version: "2.0"
 
-    development: yes #do a developers install instead of building containers
+    development: no #do a developers install instead of building containers
 
     # Directory paths
     base_dir: "{{ working_directory }}"
